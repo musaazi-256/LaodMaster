@@ -1,0 +1,14 @@
+<svg width="120" height="120" viewBox="0 0 120 120" fill="none" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Medium truck placeholder illustration">
+  <line x1="6" y1="86" x2="114" y2="86" stroke="#E2E8F0" stroke-width="2"/>
+  <rect x="14" y="40" width="64" height="38" rx="4" fill="#DDF4E7" stroke="#50BB7F" stroke-width="2"/>
+  <path d="M78 50H94C97 50 99.5 51.8 100.5 54.5L103 64H78V50Z" fill="#50BB7F"/>
+  <rect x="85" y="54" width="12" height="9" rx="1.5" fill="#EFFAF4"/>
+  <rect x="14" y="78" width="89" height="6" rx="2" fill="#50BB7F"/>
+  <circle cx="32" cy="86" r="9" fill="#111827"/>
+  <circle cx="32" cy="86" r="3.5" fill="#F8FAFC"/>
+  <circle cx="60" cy="86" r="9" fill="#111827"/>
+  <circle cx="60" cy="86" r="3.5" fill="#F8FAFC"/>
+  <circle cx="92" cy="86" r="9" fill="#111827"/>
+  <circle cx="92" cy="86" r="3.5" fill="#F8FAFC"/>
+  <text x="60" y="104" font-family="Inter, sans-serif" font-size="9" fill="#64748B" text-anchor="middle">MEDIUM · 3-7t</text>
+</svg>

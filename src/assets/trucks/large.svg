@@ -1,0 +1,17 @@
+<svg width="120" height="120" viewBox="0 0 120 120" fill="none" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Large truck placeholder illustration">
+  <line x1="4" y1="88" x2="116" y2="88" stroke="#E2E8F0" stroke-width="2"/>
+  <rect x="10" y="46" width="76" height="18" rx="2" fill="#DDF4E7" stroke="#50BB7F" stroke-width="2"/>
+  <rect x="10" y="64" width="76" height="8" fill="#50BB7F"/>
+  <path d="M86 52H100C103 52 105.5 53.8 106.5 56.5L109 66H86V52Z" fill="#369663"/>
+  <rect x="93" y="56" width="11" height="9" rx="1.5" fill="#EFFAF4"/>
+  <rect x="10" y="80" width="99" height="6" rx="2" fill="#50BB7F"/>
+  <circle cx="26" cy="88" r="8.5" fill="#111827"/>
+  <circle cx="26" cy="88" r="3.2" fill="#F8FAFC"/>
+  <circle cx="46" cy="88" r="8.5" fill="#111827"/>
+  <circle cx="46" cy="88" r="3.2" fill="#F8FAFC"/>
+  <circle cx="80" cy="88" r="8.5" fill="#111827"/>
+  <circle cx="80" cy="88" r="3.2" fill="#F8FAFC"/>
+  <circle cx="98" cy="88" r="8.5" fill="#111827"/>
+  <circle cx="98" cy="88" r="3.2" fill="#F8FAFC"/>
+  <text x="60" y="104" font-family="Inter, sans-serif" font-size="9" fill="#64748B" text-anchor="middle">LARGE · 7-12t</text>
+</svg>
