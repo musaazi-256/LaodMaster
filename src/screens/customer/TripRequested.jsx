@@ -1,6 +1,6 @@
 import { useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ArrowLeft, Pencil, CheckCircle2, X, Radar } from 'lucide-react';
+import { ArrowLeft, CheckCircle2, X, Radar } from 'lucide-react';
 import { useAppState } from '../../state/AppStateContext';
 import MapCanvas from '../../components/logistics/MapCanvas';
 import smallTruckFrontSide from '../../assets/trucks/Small truck front side.png';
@@ -32,7 +32,7 @@ export default function TripRequested() {
   const destinationText = activeTrip?.destination || draft?.destination?.label || 'Garden City Mall';
 
   return (
-    <div className="relative w-full h-full min-h-0 flex flex-col justify-between overflow-hidden font-sans bg-slate-100">
+    <div className="relative w-full flex-1 min-h-0 flex flex-col justify-between overflow-hidden font-sans bg-slate-100">
       {/* BACKGROUND MAP CANVAS */}
       <div className="absolute inset-0 z-0">
         <MapCanvas
@@ -44,7 +44,7 @@ export default function TripRequested() {
         />
       </div>
 
-      {/* TOP HEADER & FLOATING ROUTE SUMMARY CARD */}
+      {/* TOP HEADER */}
       <div className="relative z-20 pt-12 px-4 flex flex-col gap-3 pointer-events-none">
         {/* Header Bar */}
         <div className="flex items-center gap-3 pointer-events-auto">
@@ -64,52 +64,6 @@ export default function TripRequested() {
               We're searching for nearby trucks
             </p>
           </div>
-        </div>
-
-        {/* Floating Route Summary Card */}
-        <div className="w-full bg-white/95 backdrop-blur-md shadow-md rounded-[18px] border border-neutral-200/80 p-3 flex items-center justify-between gap-2 pointer-events-auto mt-1">
-          {/* Pickup Segment */}
-          <div className="flex items-center gap-2.5 min-w-0 flex-1">
-            <div className="w-3.5 h-3.5 rounded-full border-2 border-[#059447] bg-white flex items-center justify-center shrink-0">
-              <div className="w-1.5 h-1.5 rounded-full bg-[#059447]" />
-            </div>
-            <div className="flex flex-col truncate text-left">
-              <span className="text-[9.5px] font-semibold text-[#64748B] uppercase tracking-wider leading-none">
-                Pickup location
-              </span>
-              <span className="text-[13px] font-bold text-[#0F172A] truncate leading-tight mt-0.5">
-                {originText}
-              </span>
-            </div>
-          </div>
-
-          {/* Vertical Divider */}
-          <div className="w-[1px] h-6 bg-neutral-200 shrink-0" />
-
-          {/* Drop-off Segment */}
-          <div className="flex items-center gap-2.5 min-w-0 flex-1">
-            <div className="w-3.5 h-3.5 rounded-full border-2 border-[#E11D48] bg-white flex items-center justify-center shrink-0">
-              <div className="w-1.5 h-1.5 rounded-full bg-[#E11D48]" />
-            </div>
-            <div className="flex flex-col truncate text-left">
-              <span className="text-[9.5px] font-semibold text-[#64748B] uppercase tracking-wider leading-none">
-                Drop-off location
-              </span>
-              <span className="text-[13px] font-bold text-[#0F172A] truncate leading-tight mt-0.5">
-                {destinationText}
-              </span>
-            </div>
-          </div>
-
-          {/* Edit Button */}
-          <button
-            type="button"
-            onClick={() => navigate('/customer/request')}
-            className="w-7 h-7 rounded-full bg-neutral-100 hover:bg-neutral-200 flex items-center justify-center text-neutral-600 transition-colors shrink-0 cursor-pointer ml-1"
-            title="Edit location"
-          >
-            <Pencil size={13} />
-          </button>
         </div>
       </div>
 

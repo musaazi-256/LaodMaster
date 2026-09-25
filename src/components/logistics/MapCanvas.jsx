@@ -5,7 +5,7 @@ import 'maplibre-gl/dist/maplibre-gl.css';
 import maplibreWorkerUrl from 'maplibre-gl/dist/maplibre-gl-worker.mjs?worker&url';
 import { CheckCircle2, Navigation } from 'lucide-react';
 import { cx } from '../../lib/cx';
-import { resolvePlace, fetchRoute, pointAlongRoute, sliceRoute } from '../../lib/geo';
+import { resolvePlace, fetchRoute, pointAlongRoute, sliceRoute, remainingRoute, pointAtBearing } from '../../lib/geo';
 import smallTruckBackSide from '../../assets/trucks/Small truck back side.png';
 import smallTruckFrontSide from '../../assets/trucks/Small truck front side.png';
 
@@ -517,9 +517,25 @@ const PICKUP_PIN_SVG = `
 </svg>
 `;
 
-function buildPickupBannerLabelEl(title, subtitle, showTag = true, cardSide = 'right') {
+const DESTINATION_PIN_SVG = `
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 126.68 190.63" width="38" height="57" style="display:block;">
+  <g>
+    <g>
+      <path fill="#232323" d="M63.34,0C28.36,0,0,28.36,0,63.34s63.34,127.29,63.34,127.29c0,0,63.34-92.3,63.34-127.29S98.32,0,63.34,0Z"/>
+      <path fill="#1e1e1e" d="M48.4,166.4c8.63,14.46,14.94,24.23,14.94,24.23,0,0,63.34-92.3,63.34-127.29,0-1.84-.1-3.65-.25-5.45-2.5,9.72-6.03,19.18-10.37,28.21-11.99,24.96-29.72,40.95-48.6,61.19-6.09,6.53-12.42,12.98-19.05,19.1Z"/>
+    </g>
+    <g>
+      <polygon fill="#fff" points="96.78 40.26 63.34 57.12 29.9 40.26 63.34 26.65 96.78 40.26"/>
+      <polygon fill="#fff" points="61.43 91.77 29.9 75.76 29.9 44.23 61.43 60.25 61.43 91.77"/>
+      <polygon fill="#fff" points="65.26 91.77 96.78 75.76 96.78 44.23 65.26 60.25 65.26 91.77"/>
+    </g>
+  </g>
+</svg>
+`;
+
+function buildLocationBannerLabelEl(type, title, subtitle, showTag = true, cardSide = 'right') {
   const container = document.createElement('div');
-  container.className = 'lm-pickup-banner-container';
+  container.className = `lm-${type}-banner-container`;
   container.style.cssText = `
     display: inline-flex;
     align-items: flex-start;
@@ -528,11 +544,11 @@ function buildPickupBannerLabelEl(title, subtitle, showTag = true, cardSide = 'r
     filter: drop-shadow(0 4px 12px rgba(0, 0, 0, 0.14));
   `;
 
-  // Green Teardrop Pin
+  // Teardrop Pin
   const pinWrap = document.createElement('div');
   pinWrap.className = 'lm-pin-wrap';
   pinWrap.style.cssText = 'position:relative;z-index:2;flex-shrink:0;width:38px;height:57px;';
-  pinWrap.innerHTML = PICKUP_PIN_SVG;
+  pinWrap.innerHTML = type === 'destination' ? DESTINATION_PIN_SVG : PICKUP_PIN_SVG;
 
   // White Banner Card attached seamlessly behind the pin head
   const bannerCard = document.createElement('div');
@@ -555,7 +571,7 @@ function buildPickupBannerLabelEl(title, subtitle, showTag = true, cardSide = 'r
 
   const titleEl = document.createElement('span');
   titleEl.style.cssText = 'font-size: 13px; font-weight: 800; color: #1E293B; line-height: 1.2; display: block; letter-spacing: -0.01em;';
-  titleEl.textContent = title || 'Pickup location';
+  titleEl.textContent = title || (type === 'destination' ? 'Destination' : 'Pickup location');
 
   const subtitleEl = document.createElement('span');
   subtitleEl.style.cssText = 'font-size: 11.5px; font-weight: 500; color: #64748B; line-height: 1.3; margin-top: 2px; display: block; max-width: 165px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;';
@@ -574,6 +590,14 @@ function buildPickupBannerLabelEl(title, subtitle, showTag = true, cardSide = 'r
   }
 
   return container;
+}
+
+function buildPickupBannerLabelEl(title, subtitle, showTag = true, cardSide = 'right') {
+  return buildLocationBannerLabelEl('pickup', title, subtitle, showTag, cardSide);
+}
+
+function buildDestinationBannerLabelEl(title, subtitle, showTag = true, cardSide = 'right') {
+  return buildLocationBannerLabelEl('destination', title, subtitle, showTag, cardSide);
 }
 
 function buildSpeechBubbleLabelEl(title, subtitle) {
@@ -660,6 +684,8 @@ function removeMarker(markersRef, key) {
   }
 }
 
+const MAX_NEARBY_TRUCKS = 8;
+
 export default function MapCanvas({
   state = 'idle',
   originLabel = '',
@@ -667,27 +693,51 @@ export default function MapCanvas({
   className,
   fullBleed = false,
   visiblePadding,
+  nearbyTruckCount = 3,
+  truckStatusMix = 'available',
+  progressOverride,
 }) {
   const config = STATE_CONFIG[state] ?? STATE_CONFIG.idle;
+  const effectiveProgress =
+    typeof progressOverride === 'number' ? Math.max(0, Math.min(1, progressOverride)) : config.progress;
   const showDestination = Boolean(destinationLabel) && destinationLabel !== 'Destination';
 
   const containerRef = useRef(null);
   const mapRef = useRef(null);
   const markersRef = useRef({});
   const mapResizeObserverRef = useRef(null);
+  // Smoothed heading the moving truck marker currently faces, as a unit vector (not degrees,
+  // so blending never needs to special-case wraparound at 0/360). Persists across renders so
+  // it keeps converging frame to frame instead of resetting.
+  const truckHeadingRef = useRef({ dx: 0, dy: -1 });
   const [mapLoaded, setMapLoaded] = useState(false);
   const [controlsActive, setControlsActive] = useState(false);
   const [routes, setRoutes] = useState({ approach: null, main: null });
 
   const originCoord = useMemo(() => resolvePlace(originLabel), [originLabel]);
   const destCoord = useMemo(() => resolvePlace(destinationLabel), [destinationLabel]);
-  // Truck 1 sat north-east of the pickup point, which is exactly where the "Pickup
-  // location" banner (anchored bottom-left, extending up and to the right) renders —
-  // it was hidden behind that banner for the app's default pickup label. Moved it due
-  // west, clear of the banner, and kept 2/3 south so all three stay visually separated.
-  const driverStart = useMemo(() => [originCoord[0] - 0.003, originCoord[1] + 0.0005], [originCoord]);
-  const driverStart2 = useMemo(() => [originCoord[0] - 0.001, originCoord[1] - 0.0035], [originCoord]);
-  const driverStart3 = useMemo(() => [originCoord[0] + 0.0028, originCoord[1] - 0.002], [originCoord]);
+  // The assigned driver's starting point once a trip is booked (used for the approach route
+  // to pickup) — stays due west of the pickup, clear of the "Pickup location" banner (anchored
+  // bottom-left, extending up and to the right) which would otherwise hide it.
+  const driverStart = useMemo(() => pointAtBearing(originCoord, 270, 1.4), [originCoord]);
+
+  // "Nearby trucks" shown before a trip is booked (idle/searching state), scattered within a
+  // real 2km radius of the pickup point — count is configurable (e.g. from the Live Demo's
+  // simulation controls) for testing map density. Truck 0 reuses driverStart itself; the rest
+  // spread evenly across the southern ~160° arc (bearings 100°-260°) so none of them land in
+  // the northern quadrant the pickup banner occupies.
+  const nearbyTruckCoords = useMemo(() => {
+    const count = Math.max(0, Math.min(MAX_NEARBY_TRUCKS, Math.round(nearbyTruckCount)));
+    if (count === 0) return [];
+    const coords = [driverStart];
+    const extra = count - 1;
+    for (let i = 0; i < extra; i++) {
+      const bearing = extra === 1 ? 180 : 100 + (i * 160) / (extra - 1);
+      const distance = Math.min(2, 0.6 + ((i * 3) % 5) * 0.35);
+      coords.push(pointAtBearing(originCoord, bearing, distance));
+    }
+    return coords;
+  }, [driverStart, originCoord, nearbyTruckCount]);
 
   // Create the map once per mount after loading transformed LoadMastr style JSON.
   useEffect(() => {
@@ -726,7 +776,6 @@ export default function MapCanvas({
 
       map.on('load', () => {
         map.addSource('approach-route', { type: 'geojson', data: lineFC([]) });
-        map.addSource('approach-progress', { type: 'geojson', data: lineFC([]) });
         map.addSource('main-route', { type: 'geojson', data: lineFC([]) });
         map.addSource('main-progress', { type: 'geojson', data: lineFC([]) });
 
@@ -745,21 +794,6 @@ export default function MapCanvas({
           layout: { 'line-cap': 'round', 'line-join': 'round' },
           paint: { 'line-color': MAP_TOKENS.routeActive, 'line-width': 4.5, 'line-opacity': 0.5, 'line-dasharray': [1, 1.6] },
         });
-        map.addLayer({
-          id: 'approach-progress-casing',
-          type: 'line',
-          source: 'approach-progress',
-          layout: { 'line-cap': 'round', 'line-join': 'round' },
-          paint: { 'line-color': MAP_TOKENS.routeOutline, 'line-width': 7, 'line-opacity': 0.95 },
-        });
-        map.addLayer({
-          id: 'approach-progress-line',
-          type: 'line',
-          source: 'approach-progress',
-          layout: { 'line-cap': 'round', 'line-join': 'round' },
-          paint: { 'line-color': MAP_TOKENS.routeActive, 'line-width': 4.5 },
-        });
-
         // Main route double-layer treatment
         map.addLayer({
           id: 'main-route-casing',
@@ -854,9 +888,54 @@ export default function MapCanvas({
       right: safeRightPadding,
     };
 
-    if (!showDestination && (state === 'idle' || state === 'searching')) {
-      // Before ordering: Keep current location centered in the VISIBLE map area with a relaxed zoom out (13.5)
-      map.flyTo({ center: originCoord, zoom: 13.5, padding: activePadding, duration: 600 });
+    // fitBounds places a bounds corner exactly ON the padding edge — a point at the
+    // fitted extreme lands with zero margin. Markers have their own visual footprint
+    // (pickup/destination dots plus their label bubbles), so without extra clearance
+    // beyond the raw UI-obstruction padding, a boundary marker renders clipped right at
+    // the edge of the bottom sheet / status bar instead of comfortably inside it.
+    const markerClearance = 36;
+    const fitPadding = {
+      top: activePadding.top + markerClearance,
+      bottom: activePadding.bottom + markerClearance,
+      left: activePadding.left + markerClearance,
+      right: activePadding.right + markerClearance,
+    };
+
+    if (effectiveProgress === 1 && config.truckState === 'arrived') {
+      // Arrival (at pickup, or later at the destination): the truck marker sits right on top
+      // of the pickup/destination pin at this point, so fitting bounds across the whole trip
+      // extent (as the branch below does mid-trip) leaves them a tiny, hard-to-read cluster in
+      // a zoomed-out view. Zoom in close on wherever the truck actually is instead.
+      const arrivalPoint = config.phase === 'main' ? destCoord : originCoord;
+      map.flyTo({ center: arrivalPoint, zoom: 16.5, padding: activePadding, duration: 700 });
+    } else if (!showDestination && (state === 'idle' || state === 'searching')) {
+      // Before ordering: frame the pickup together with the nearby trucks so the full ~2km
+      // spread is actually visible, not just the pickup point. A flat zoom constant isn't
+      // enough for that: Web Mercator needs a different zoom at different latitudes to show
+      // the same real-world distance, and a free-text search can put the pickup anywhere on
+      // the globe — fitBounds accounts for that automatically the same way the branch below
+      // already does for origin/destination.
+      const bounds = new LngLatBounds();
+      bounds.extend(originCoord);
+      nearbyTruckCoords.forEach((coord) => bounds.extend(coord));
+      map.fitBounds(bounds, { padding: fitPadding, maxZoom: 14.2, duration: 600 });
+    } else if (config.showApproach) {
+      // While the driver is still heading to pickup (not yet arrived): the pickup point and the
+      // driver's actual current position are what the customer needs to see clearly — the
+      // destination can be far across town at this stage, and fitting it in too would force a
+      // wide, zoomed-out view that makes both the truck and the pickup hard to make out. The
+      // destination pin still renders (see the marker-sync effect below); it just doesn't drive
+      // the camera until the trip is actually under way.
+      const approachCoords = routes.approach ?? (driverStart ? [driverStart, originCoord] : []);
+      const truckPoint = pointAlongRoute(approachCoords, effectiveProgress);
+      const bounds = new LngLatBounds();
+      bounds.extend(originCoord);
+      if (truckPoint) {
+        bounds.extend([truckPoint.lng, truckPoint.lat]);
+      } else if (driverStart) {
+        bounds.extend(driverStart);
+      }
+      map.fitBounds(bounds, { padding: fitPadding, maxZoom: 15, duration: 700 });
     } else {
       // Once destination is set or during active trip: zoom out and fit bounds to encompass both locations & route (maxZoom 12.8)
       const bounds = new LngLatBounds();
@@ -872,19 +951,6 @@ export default function MapCanvas({
         routes.main.forEach((pt) => bounds.extend(pt));
       }
 
-      // fitBounds places a bounds corner exactly ON the padding edge — a point at the
-      // fitted extreme lands with zero margin. Markers have their own visual footprint
-      // (pickup/destination dots plus their label bubbles), so without extra clearance
-      // beyond the raw UI-obstruction padding, a boundary marker renders clipped right at
-      // the edge of the bottom sheet / status bar instead of comfortably inside it.
-      const markerClearance = 36;
-      const fitPadding = {
-        top: activePadding.top + markerClearance,
-        bottom: activePadding.bottom + markerClearance,
-        left: activePadding.left + markerClearance,
-        right: activePadding.right + markerClearance,
-      };
-
       map.fitBounds(bounds, { padding: fitPadding, maxZoom: 12.8, duration: 700 });
     }
 
@@ -894,58 +960,107 @@ export default function MapCanvas({
 
   useEffect(() => {
     handleRecenter();
+    // effectiveProgress ticks on every animation frame during a running trip simulation;
+    // re-fitting the camera that often would restart its own 700ms flyTo before the last one
+    // finishes and never settle. Bucketing into 20 steps keeps the truck comfortably in frame
+    // as it moves without fighting itself — at the 30s pickup-phase simulation duration, that's
+    // about one re-fit every ~1.5s, comfortably longer than the flyTo's own duration.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [mapLoaded, driverStart, originCoord, destCoord, showDestination, routes.main, fullBleed]);
+  }, [mapLoaded, state, Math.round(effectiveProgress * 20), driverStart, nearbyTruckCoords, originCoord, destCoord, showDestination, routes.approach, routes.main, fullBleed]);
 
-  // Dynamic calculation for pickup banner tag side (left vs right)
-  const updatePickupBannerSide = useCallback(() => {
+  // Dynamic calculation for pickup & destination banner tag sides (left vs right)
+  const updateLocationBannersSide = useCallback(() => {
     const map = mapRef.current;
-    if (!map || !mapLoaded || !originCoord) return;
+    if (!map || !mapLoaded) return;
+    const containerWidth = map.getContainer()?.clientWidth || 390;
 
-    let cardSide = 'right';
-    try {
-      const pt = map.project(originCoord);
-      const w = map.getContainer()?.clientWidth || 390;
-      if (pt.x > w * 0.55) {
-        cardSide = 'left';
+    // 1. Pickup Banner Tag
+    if (originCoord) {
+      let cardSide = 'right';
+      try {
+        const pt = map.project(originCoord);
+        if (pt.x > containerWidth * 0.55) {
+          cardSide = 'left';
+        }
+      } catch {
+        cardSide = 'right';
       }
-    } catch {
-      cardSide = 'right';
+
+      const hasPickupTag = Boolean(originLabel && originLabel.trim() !== '');
+      const targetAnchor = cardSide === 'left' ? 'bottom-right' : 'bottom-left';
+      const targetOffset = cardSide === 'left' ? [19, 0] : [-19, 0];
+
+      const originLabelMarker = ensureMarker(
+        markersRef,
+        map,
+        'origin-label',
+        () => buildPickupBannerLabelEl('Pickup location', originLabel || '', hasPickupTag, cardSide),
+        originCoord,
+        {
+          anchor: targetAnchor,
+          offset: targetOffset,
+        }
+      );
+
+      const containerEl = originLabelMarker.getElement();
+      if (containerEl) {
+        const bannerCard = containerEl.querySelector('.lm-banner-card');
+        if (bannerCard) {
+          bannerCard.style.display = hasPickupTag ? 'flex' : 'none';
+          const labelEl = bannerCard.querySelector('[data-label]');
+          if (labelEl) labelEl.textContent = originLabel || '';
+        }
+      }
     }
 
-    const hasPickupTag = Boolean(originLabel && originLabel.trim() !== '');
-    const targetAnchor = cardSide === 'left' ? 'bottom-right' : 'bottom-left';
-    const targetOffset = cardSide === 'left' ? [19, 0] : [-19, 0];
-
-    const originLabelMarker = ensureMarker(
-      markersRef,
-      map,
-      'origin-label',
-      () => buildPickupBannerLabelEl('Pickup location', originLabel || '', hasPickupTag, cardSide),
-      originCoord,
-      {
-        anchor: targetAnchor,
-        offset: targetOffset,
+    // 2. Destination Banner Tag
+    if (showDestination && destCoord) {
+      let cardSide = 'right';
+      try {
+        const pt = map.project(destCoord);
+        if (pt.x > containerWidth * 0.55) {
+          cardSide = 'left';
+        }
+      } catch {
+        cardSide = 'right';
       }
-    );
 
-    const containerEl = originLabelMarker.getElement();
-    if (containerEl) {
-      const bannerCard = containerEl.querySelector('.lm-banner-card');
-      if (bannerCard) {
-        bannerCard.style.display = hasPickupTag ? 'flex' : 'none';
-        const labelEl = bannerCard.querySelector('[data-label]');
-        if (labelEl) labelEl.textContent = originLabel || '';
+      const hasDestTag = Boolean(destinationLabel && destinationLabel.trim() !== '' && destinationLabel !== 'Destination');
+      const targetAnchor = cardSide === 'left' ? 'bottom-right' : 'bottom-left';
+      const targetOffset = cardSide === 'left' ? [19, 0] : [-19, 0];
+
+      const destLabelMarker = ensureMarker(
+        markersRef,
+        map,
+        'destination-label',
+        () => buildDestinationBannerLabelEl('Destination', destinationLabel || '', hasDestTag, cardSide),
+        destCoord,
+        {
+          anchor: targetAnchor,
+          offset: targetOffset,
+        }
+      );
+
+      const containerEl = destLabelMarker.getElement();
+      if (containerEl) {
+        const bannerCard = containerEl.querySelector('.lm-banner-card');
+        if (bannerCard) {
+          bannerCard.style.display = hasDestTag ? 'flex' : 'none';
+          const labelEl = bannerCard.querySelector('[data-label]');
+          if (labelEl) labelEl.textContent = destinationLabel || '';
+        }
       }
+    } else {
+      removeMarker(markersRef, 'destination-label');
     }
-  }, [mapLoaded, originCoord, originLabel]);
+  }, [mapLoaded, originCoord, originLabel, destCoord, destinationLabel, showDestination]);
 
-  // Subscribe to map camera movements so the tag automatically flips side during fitBounds or dragPan
+  // Subscribe to map camera movements so the tags automatically flip side during fitBounds or dragPan
   useEffect(() => {
     const map = mapRef.current;
     if (!map || !mapLoaded) return undefined;
 
-    const handleMove = () => updatePickupBannerSide();
+    const handleMove = () => updateLocationBannersSide();
     // Fire immediately in case map was panned/fitted
     handleMove();
     map.on('move', handleMove);
@@ -954,7 +1069,7 @@ export default function MapCanvas({
       map.off('move', handleMove);
       map.off('moveend', handleMove);
     };
-  }, [mapLoaded, updatePickupBannerSide]);
+  }, [mapLoaded, updateLocationBannersSide]);
 
   // Sync route lines and markers with the current trip state.
   useEffect(() => {
@@ -964,12 +1079,15 @@ export default function MapCanvas({
     const approachCoords = routes.approach ?? (config.showApproach ? [driverStart, originCoord] : []);
     const mainCoords = routes.main ?? (showDestination ? [originCoord, destCoord] : []);
 
-    setLineSource(map, 'approach-route', config.showApproach ? approachCoords : []);
-    setLineSource(map, 'approach-progress', config.showApproach ? sliceRoute(approachCoords, config.progress) : []);
+    // While the driver is heading to pickup, only the not-yet-covered portion of the approach
+    // route stays drawn — the truck erases the path behind it as it moves, rather than leaving
+    // a traveled trail. (The main pickup->destination route keeps its separate traveled/ahead
+    // treatment further down, untouched.)
+    setLineSource(map, 'approach-route', config.showApproach ? remainingRoute(approachCoords, effectiveProgress) : []);
 
     const showMainPreview = showDestination && (config.phase === 'main' || state === 'idle' || state === 'searching');
     setLineSource(map, 'main-route', showMainPreview ? mainCoords : []);
-    setLineSource(map, 'main-progress', showDestination && config.phase === 'main' ? sliceRoute(mainCoords, config.progress) : []);
+    setLineSource(map, 'main-progress', showDestination && config.phase === 'main' ? sliceRoute(mainCoords, effectiveProgress) : []);
 
     // Spec Section 3: a finished trip's travelled line reads as "completed" (#7BBF99),
     // distinct from an in-progress trip's "active" green (#50BB7F). The layer is created once
@@ -995,70 +1113,44 @@ export default function MapCanvas({
     );
     applyPickupMarkerPulse(originMarker.getElement(), isPulseActive);
 
-    // Dynamic pickup banner side (left vs right) based on active projected screen X coordinate
-    updatePickupBannerSide();
-
     // Spec Section 4: Destination Marker ◉ (#1F2937 outer, #FFFFFF fill, #1F2937 center) + Label
     if (showDestination) {
       ensureMarker(markersRef, map, 'destination', buildDestinationMarkerEl, destCoord, { anchor: 'center' });
-      const destLabelMarker = ensureMarker(
-        markersRef,
-        map,
-        'destination-label',
-        () => buildSpeechBubbleLabelEl('Destination', destinationLabel),
-        destCoord,
-        {
-          anchor: 'bottom',
-          offset: [0, -16],
-        }
-      );
-      destLabelMarker.getElement().querySelector('[data-label]').textContent = destinationLabel;
     } else {
       removeMarker(markersRef, 'destination');
-      removeMarker(markersRef, 'destination-label');
     }
 
-    // Nearby 3 Truck Markers (THD Spec Sheet v1.0 match)
+    // Dynamic location banners side (left vs right) for pickup and destination based on projected screen X coordinates
+    updateLocationBannersSide();
+
+    // Nearby Truck Markers — count and status mix are configurable (e.g. from the Live Demo's
+    // simulation controls) so testing can approximate a sparser or busier dispatch area.
     if (state === 'idle' || state === 'searching') {
       removeMarker(markersRef, 'trucks-nearby-label');
 
-      // Truck 1: Main nearby driver (front view, facing south-east)
-      const t1 = ensureMarker(
-        markersRef,
-        map,
-        'trucks-nearby',
-        () => buildTruckMarkerEl('available', 'front', false),
-        driverStart,
-        { anchor: 'center' }
-      );
-      applyTruckMarkerState(t1.getElement(), 'available', 'front', false);
-
-      // Truck 2: Second driver nearby (front view, flipped horizontally -> facing south-west)
-      const t2 = ensureMarker(
-        markersRef,
-        map,
-        'trucks-nearby-2',
-        () => buildTruckMarkerEl('available', 'front', true),
-        driverStart2,
-        { anchor: 'center' }
-      );
-      applyTruckMarkerState(t2.getElement(), 'available', 'front', true);
-
-      // Truck 3: Third driver nearby (back view, flipped horizontally -> facing north-east)
-      const t3 = ensureMarker(
-        markersRef,
-        map,
-        'trucks-nearby-3',
-        () => buildTruckMarkerEl('available', 'back', true),
-        driverStart3,
-        { anchor: 'center' }
-      );
-      applyTruckMarkerState(t3.getElement(), 'available', 'back', true);
+      const facingCycle = [['front', false], ['front', true], ['back', true], ['back', false]];
+      const statusCycle = ['available', 'busy', 'offline'];
+      nearbyTruckCoords.forEach((coord, i) => {
+        const [facing, flip] = facingCycle[i % facingCycle.length];
+        const truckState = truckStatusMix === 'mixed' ? statusCycle[i % statusCycle.length] : 'available';
+        const marker = ensureMarker(
+          markersRef,
+          map,
+          `trucks-nearby-${i}`,
+          () => buildTruckMarkerEl(truckState, facing, flip),
+          coord,
+          { anchor: 'center' }
+        );
+        applyTruckMarkerState(marker.getElement(), truckState, facing, flip);
+      });
+      for (let i = nearbyTruckCoords.length; i < MAX_NEARBY_TRUCKS; i++) {
+        removeMarker(markersRef, `trucks-nearby-${i}`);
+      }
     } else {
-      removeMarker(markersRef, 'trucks-nearby');
       removeMarker(markersRef, 'trucks-nearby-label');
-      removeMarker(markersRef, 'trucks-nearby-2');
-      removeMarker(markersRef, 'trucks-nearby-3');
+      for (let i = 0; i < MAX_NEARBY_TRUCKS; i++) {
+        removeMarker(markersRef, `trucks-nearby-${i}`);
+      }
     }
 
     // Moving marker: idle pulse ring, searching indicator, or truck along the route with dynamic segment orientation
@@ -1070,21 +1162,36 @@ export default function MapCanvas({
       removeMarker(markersRef, 'search');
       if (state !== 'idle') {
         const curveCoords = config.phase === 'pre' ? approachCoords : mainCoords;
-        const point = pointAlongRoute(curveCoords, config.progress);
+        const point = pointAlongRoute(curveCoords, effectiveProgress);
 
         // Dynamic segment bearing calculation for truck direction (front/back + left/right flip)
         let facingDir = 'front';
         let flipDir = false;
         if (curveCoords && curveCoords.length >= 2) {
           const idx = Math.min(
-            Math.floor(config.progress * (curveCoords.length - 1)),
+            Math.floor(effectiveProgress * (curveCoords.length - 1)),
             curveCoords.length - 2
           );
           const p1 = curveCoords[idx];
           const p2 = curveCoords[idx + 1];
           if (p1 && p2) {
-            const dx = p2[0] - p1[0];
-            const dy = p2[1] - p1[1];
+            const rawDx = p2[0] - p1[0];
+            const rawDy = p2[1] - p1[1];
+            const rawLen = Math.hypot(rawDx, rawDy) || 1;
+
+            // A real driving route's polyline has vertices every few meters, and the raw
+            // direction between any two adjacent ones wiggles with the actual road geometry —
+            // classifying facing/flip straight off that per-frame vector is what made the truck
+            // appear to snap between directions at random. Blending it into a running average
+            // (as a unit vector, so 350°->10° wraparound isn't an issue) means the displayed
+            // heading only turns once the road's direction has genuinely and persistently
+            // changed, instead of chasing every local wiggle.
+            const prevHeading = truckHeadingRef.current;
+            const smoothing = 0.12;
+            const dx = prevHeading.dx + (rawDx / rawLen - prevHeading.dx) * smoothing;
+            const dy = prevHeading.dy + (rawDy / rawLen - prevHeading.dy) * smoothing;
+            truckHeadingRef.current = { dx, dy };
+
             if (dy < 0) {
               // Heading South / towards bottom
               facingDir = 'front';
@@ -1117,7 +1224,7 @@ export default function MapCanvas({
     } else {
       removeMarker(markersRef, 'done');
     }
-  }, [mapLoaded, routes, state, config, originLabel, destinationLabel, showDestination, driverStart, driverStart2, driverStart3, originCoord, destCoord, updatePickupBannerSide]);
+  }, [mapLoaded, routes, state, config, effectiveProgress, originLabel, destinationLabel, showDestination, driverStart, nearbyTruckCoords, truckStatusMix, originCoord, destCoord, updateLocationBannersSide]);
 
   return (
     <div

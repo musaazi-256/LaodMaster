@@ -16,7 +16,7 @@ import {
   X,
 } from 'lucide-react';
 import { api } from '../../lib/api';
-import { TRACKING_STATES } from '../../state/AppStateContext';
+import { TRACKING_STATES, useAppState } from '../../state/AppStateContext';
 import MapCanvas from '../../components/logistics/MapCanvas';
 import { useToast } from '../../components/feedback/ToastProvider';
 import { cn } from '../../lib/utils';
@@ -44,6 +44,9 @@ export default function TrackingScreen() {
   const navigate = useNavigate();
   const { id } = useParams();
   const showToast = useToast();
+  const { customer } = useAppState();
+  const { activeSimulation, advanceTracking } = customer;
+
   const [trip, setTrip] = useState(null);
   const [notFound, setNotFound] = useState(false);
   const leavingRef = useRef(false);
@@ -70,7 +73,7 @@ export default function TrackingScreen() {
 
   if (!trip) {
     return (
-      <div className="relative w-full h-full flex items-center justify-center bg-slate-50">
+      <div className="relative w-full flex-1 flex items-center justify-center bg-slate-50">
         <div className="flex flex-col items-center gap-3">
           <div className="w-10 h-10 border-4 border-[#50BB7F] border-t-transparent rounded-full animate-spin" />
           <span className="text-[13px] font-medium text-slate-500">Loading trip details...</span>
@@ -83,6 +86,9 @@ export default function TrackingScreen() {
   const isArrivedPickup = trip.trackingState === 'driver_arrived';
   const isEnRoute = ['trip_started', 'en_route', 'near_destination', 'arrived'].includes(trip.trackingState);
   const isComplete = trip.trackingState === 'completed';
+
+  const isSimulatingThisTrip = activeSimulation?.tripId === trip.id && activeSimulation?.isRunning;
+  const progressOverride = isSimulatingThisTrip ? activeSimulation.progress : undefined;
 
   const driver = trip.driver || {
     name: 'David Mukasa',
@@ -106,11 +112,7 @@ export default function TrackingScreen() {
   }
 
   async function handleAdvance() {
-    const idx = TRACKING_STATES.indexOf(trip.trackingState);
-    const next = TRACKING_STATES[Math.min(idx + 1, TRACKING_STATES.length - 1)];
-    await api.updateTracking(trip.id, next);
-    setTrip((t) => ({ ...t, trackingState: next }));
-    showToast(`Simulated status: ${STATUS_TEXT[next] || next}`, 'info');
+    await advanceTracking(trip.id, trip.trackingState);
   }
 
   function handleShareTracking() {
@@ -132,7 +134,7 @@ export default function TrackingScreen() {
   else if (isComplete) activeStepIdx = 3;
 
   return (
-    <div className="relative w-full h-full min-h-0 flex flex-col justify-between overflow-hidden font-sans bg-slate-100">
+    <div className="relative w-full flex-1 min-h-0 flex flex-col justify-between overflow-hidden font-sans bg-slate-100">
       {/* BACKGROUND MAP CANVAS */}
       <div className="absolute inset-0 z-0">
         <MapCanvas
@@ -141,105 +143,27 @@ export default function TrackingScreen() {
           destinationLabel={trip.destination}
           fullBleed
           visiblePadding={{ top: 140, bottom: 310, left: 24, right: 24 }}
+          progressOverride={progressOverride}
         />
       </div>
 
-      {/* TOP HEADER & FLOATING ROUTE SUMMARY CARD */}
-      <div className="relative z-20 pt-12 px-4 flex flex-col gap-3 pointer-events-none">
-        {/* Header Bar */}
-        <div className="flex items-center justify-between pointer-events-auto">
-          <button
-            type="button"
-            onClick={() => navigate('/customer')}
-            className="w-10 h-10 rounded-full bg-white shadow-md border border-neutral-200/80 flex items-center justify-center text-neutral-800 hover:bg-neutral-50 active:scale-95 transition-all cursor-pointer shrink-0"
-            aria-label="Back to home"
-          >
-            <ArrowLeft size={18} />
-          </button>
-          <div className="flex flex-col text-right">
-            <span className="text-[17px] font-extrabold text-[#020617] leading-tight tracking-tight">
-              {STATUS_TEXT[trip.trackingState] || 'Live Tracking'}
-            </span>
-            <span className="text-[11.5px] font-medium text-[#64748B]">
-              Order #{trip.id.slice(0, 8)}
-            </span>
-          </div>
-        </div>
-
-        {/* Floating Route Summary Card */}
-        <div className="w-full bg-white/95 backdrop-blur-md shadow-md rounded-[18px] border border-neutral-200/80 p-3 flex items-center justify-between gap-2 pointer-events-auto mt-1">
-          {/* Pickup Segment */}
-          <div className="flex items-center gap-2.5 min-w-0 flex-1">
-            <div className="w-3.5 h-3.5 rounded-full border-2 border-[#059447] bg-white flex items-center justify-center shrink-0">
-              <div className="w-1.5 h-1.5 rounded-full bg-[#059447]" />
-            </div>
-            <div className="flex flex-col truncate text-left">
-              <span className="text-[9.5px] font-semibold text-[#64748B] uppercase tracking-wider leading-none">
-                Pickup
-              </span>
-              <span className="text-[12.5px] font-bold text-[#0F172A] truncate leading-tight mt-0.5">
-                {trip.origin}
-              </span>
-            </div>
-          </div>
-
-          {/* Vertical Divider */}
-          <div className="w-[1px] h-6 bg-neutral-200 shrink-0" />
-
-          {/* Drop-off Segment */}
-          <div className="flex items-center gap-2.5 min-w-0 flex-1">
-            <div className="w-3.5 h-3.5 rounded-full border-2 border-[#E11D48] bg-white flex items-center justify-center shrink-0">
-              <div className="w-1.5 h-1.5 rounded-full bg-[#E11D48]" />
-            </div>
-            <div className="flex flex-col truncate text-left">
-              <span className="text-[9.5px] font-semibold text-[#64748B] uppercase tracking-wider leading-none">
-                Destination
-              </span>
-              <span className="text-[12.5px] font-bold text-[#0F172A] truncate leading-tight mt-0.5">
-                {trip.destination}
-              </span>
-            </div>
-          </div>
-
-          {/* Active Status Badge Chip */}
-          <span className="px-2.5 py-1 rounded-full text-[10.5px] font-extrabold uppercase bg-emerald-50 text-[#059447] border border-emerald-200 shrink-0 ml-1">
-            {isComplete ? 'Done' : isEnRoute ? 'En Route' : 'Approaching'}
+      {/* TOP HEADER BAR */}
+      <div className="relative z-20 pt-10 px-4 flex items-center justify-between pointer-events-none">
+        <button
+          type="button"
+          onClick={() => navigate('/customer')}
+          className="w-10 h-10 rounded-full bg-white/95 backdrop-blur-md shadow-md border border-neutral-200/80 flex items-center justify-center text-neutral-800 hover:bg-neutral-50 active:scale-95 transition-all pointer-events-auto cursor-pointer shrink-0"
+          aria-label="Back to home"
+        >
+          <ArrowLeft size={18} />
+        </button>
+        <div className="flex flex-col text-right pointer-events-auto bg-white/90 backdrop-blur-md px-3.5 py-1.5 rounded-2xl border border-neutral-200/60 shadow-xs">
+          <span className="text-[15px] font-extrabold text-[#020617] leading-tight tracking-tight">
+            {STATUS_TEXT[trip.trackingState] || 'Live Tracking'}
           </span>
-        </div>
-      </div>
-
-      {/* MAP OVERLAY FLOATING STATUS PILL */}
-      <div className="relative z-20 px-4 mb-2 pointer-events-none">
-        <div className="inline-flex items-center gap-2.5 bg-white/95 backdrop-blur-md shadow-md rounded-full border border-neutral-200/80 px-3.5 py-2 pointer-events-auto">
-          <div className="w-7 h-7 rounded-full bg-emerald-50 border border-emerald-200 flex items-center justify-center text-[#059447] shrink-0">
-            {isArrivedPickup ? (
-              <KeyRound size={15} />
-            ) : isComplete ? (
-              <CheckCircle2 size={15} />
-            ) : (
-              <Clock size={15} />
-            )}
-          </div>
-          <div className="flex flex-col text-left">
-            <span className="text-[12px] font-bold text-[#0F172A] leading-tight">
-              {isArrivedPickup
-                ? 'Load Verification PIN: 4892'
-                : isComplete
-                ? 'Trip Completed'
-                : isEnRoute
-                ? `ETA ~${trip.etaMinutes ?? 18} mins remaining`
-                : `Driver ETA ~${trip.etaMinutes ?? 3} mins`}
-            </span>
-            <span className="text-[10.5px] font-normal text-[#64748B] leading-tight">
-              {isArrivedPickup
-                ? 'Share this PIN code with the driver to start trip'
-                : isComplete
-                ? 'Cargo delivered safely'
-                : isEnRoute
-                ? `${trip.distanceKm ?? 14} km remaining to destination`
-                : 'Driver is approaching your pickup spot'}
-            </span>
-          </div>
+          <span className="text-[11px] font-semibold text-[#64748B]">
+            Order #{trip.id.slice(0, 8)}
+          </span>
         </div>
       </div>
 
@@ -248,53 +172,93 @@ export default function TrackingScreen() {
         {/* DRAG HANDLE PILL */}
         <div className="w-[52px] h-[5px] bg-[#475569]/30 rounded-full mx-auto" />
 
-        {/* DRIVER INFO CARD */}
+        {/* DRIVER INFO & TRIP STATUS CARD */}
         {driver && (
-          <div className="bg-[#F8FAFC] rounded-[20px] p-3.5 border border-slate-100 flex items-center justify-between gap-3">
-            <div className="flex items-center gap-3 min-w-0 flex-1">
-              <div className="relative shrink-0">
-                <img
-                  src={driver.photo}
-                  alt={driver.name}
-                  className="w-12 h-12 rounded-full object-cover border-2 border-white shadow-2xs"
-                />
-                <span className="absolute bottom-0 right-0 w-3.5 h-3.5 rounded-full bg-[#059447] border-2 border-white" />
-              </div>
-              <div className="flex flex-col text-left min-w-0">
-                <div className="flex items-center gap-1.5">
-                  <span className="text-[14px] font-bold text-[#0F172A] truncate">
-                    {driver.name}
-                  </span>
-                  <span className="text-[11px] font-semibold text-[#059447] bg-emerald-50 border border-emerald-200 rounded-md px-1.5 py-0.2 shrink-0">
-                    ★ {driver.rating}
+          <div className="bg-[#F8FAFC] rounded-[20px] p-3.5 border border-slate-200/80 flex flex-col gap-3">
+            {/* Driver Profile Row */}
+            <div className="flex items-center justify-between gap-3">
+              <div className="flex items-center gap-3 min-w-0 flex-1">
+                <div className="relative shrink-0">
+                  <img
+                    src={driver.photo}
+                    alt={driver.name}
+                    className="w-12 h-12 rounded-full object-cover border-2 border-white shadow-2xs"
+                  />
+                  <span className="absolute bottom-0 right-0 w-3.5 h-3.5 rounded-full bg-[#059447] border-2 border-white" />
+                </div>
+                <div className="flex flex-col text-left min-w-0">
+                  <div className="flex items-center gap-1.5">
+                    <span className="text-[14px] font-bold text-[#0F172A] truncate">
+                      {driver.name}
+                    </span>
+                    <span className="text-[11px] font-semibold text-[#059447] bg-emerald-50 border border-emerald-200 rounded-md px-1.5 py-0.2 shrink-0">
+                      ★ {driver.rating}
+                    </span>
+                  </div>
+                  <span className="text-[12px] font-medium text-[#64748B] truncate mt-0.5">
+                    {driver.vehicleModel} · <strong className="text-[#0F172A] font-bold">{driver.plateNumber}</strong>
                   </span>
                 </div>
-                <span className="text-[12px] font-medium text-[#64748B] truncate mt-0.5">
-                  {driver.vehicleModel} · <strong className="text-[#0F172A] font-bold">{driver.plateNumber}</strong>
-                </span>
+              </div>
+
+              {/* Call & Chat Quick Action Buttons */}
+              <div className="flex items-center gap-2 shrink-0">
+                <button
+                  type="button"
+                  onClick={() => showToast(`Calling ${driver.name} (${driver.phone})…`, 'info')}
+                  className="w-9 h-9 rounded-full bg-[#E8F7EF] hover:bg-[#d5f2e2] text-[#059447] border border-[#50BB7F]/30 flex items-center justify-center transition-all cursor-pointer active:scale-95"
+                  aria-label="Call driver"
+                  title="Call driver"
+                >
+                  <Phone size={16} />
+                </button>
+                <button
+                  type="button"
+                  onClick={() => showToast('Opening message chat…', 'info')}
+                  className="w-9 h-9 rounded-full bg-slate-100 hover:bg-slate-200 text-slate-700 border border-slate-200 flex items-center justify-center transition-all cursor-pointer active:scale-95"
+                  aria-label="Message driver"
+                  title="Message driver"
+                >
+                  <MessageSquare size={16} />
+                </button>
               </div>
             </div>
 
-            {/* Call & Chat Quick Action Buttons */}
-            <div className="flex items-center gap-2 shrink-0">
-              <button
-                type="button"
-                onClick={() => showToast(`Calling ${driver.name} (${driver.phone})…`, 'info')}
-                className="w-9 h-9 rounded-full bg-[#E8F7EF] hover:bg-[#d5f2e2] text-[#059447] border border-[#50BB7F]/30 flex items-center justify-center transition-all cursor-pointer active:scale-95"
-                aria-label="Call driver"
-                title="Call driver"
-              >
-                <Phone size={16} />
-              </button>
-              <button
-                type="button"
-                onClick={() => showToast('Opening message chat…', 'info')}
-                className="w-9 h-9 rounded-full bg-slate-100 hover:bg-slate-200 text-slate-700 border border-slate-200 flex items-center justify-center transition-all cursor-pointer active:scale-95"
-                aria-label="Message driver"
-                title="Message driver"
-              >
-                <MessageSquare size={16} />
-              </button>
+            {/* TRIP STATUS & ETA BAR */}
+            <div className="flex items-center gap-2.5 bg-white rounded-2xl border border-slate-200/90 px-3 py-2 shadow-2xs">
+              <div className="w-7 h-7 rounded-full bg-emerald-50 border border-emerald-200 flex items-center justify-center text-[#059447] shrink-0">
+                {isArrivedPickup ? (
+                  <KeyRound size={15} />
+                ) : isComplete ? (
+                  <CheckCircle2 size={15} />
+                ) : (
+                  <Clock size={15} />
+                )}
+              </div>
+              <div className="flex flex-col text-left min-w-0">
+                <span className="text-[12px] font-bold text-[#0F172A] leading-tight truncate">
+                  {isSimulatingThisTrip
+                    ? activeSimulation.phase === 'pickup'
+                      ? `Driver arriving in ~${activeSimulation.remainingSec}s (Live)`
+                      : `ETA ~${activeSimulation.remainingSec}s remaining (Live)`
+                    : isArrivedPickup
+                    ? 'Load Verification PIN: 4892'
+                    : isComplete
+                    ? 'Trip Completed'
+                    : isEnRoute
+                    ? `Arriving in ~${trip.etaMinutes ?? 18} mins · ${trip.distanceKm ?? 14} km`
+                    : `Arriving in ${trip.etaMinutes ?? 6} mins · ${trip.distanceKm ?? 2.1} km`}
+                </span>
+                <span className="text-[10.5px] font-normal text-[#64748B] leading-tight truncate mt-0.5">
+                  {isArrivedPickup
+                    ? 'Share this PIN code with the driver to start trip'
+                    : isComplete
+                    ? 'Cargo delivered safely'
+                    : isEnRoute
+                    ? 'Cargo is in transit to your destination'
+                    : 'Driver is approaching your pickup spot'}
+                </span>
+              </div>
             </div>
           </div>
         )}
@@ -396,10 +360,19 @@ export default function TrackingScreen() {
             <button
               type="button"
               onClick={handleAdvance}
-              className="w-full py-1.5 mt-0.5 text-[11px] font-semibold text-slate-400 hover:text-slate-600 border border-dashed border-slate-200 rounded-lg flex items-center justify-center gap-1.5 transition-colors cursor-pointer bg-slate-50/50"
+              className={cn(
+                'w-full py-2 mt-0.5 text-[11.5px] font-bold rounded-xl flex items-center justify-center gap-2 transition-all cursor-pointer shadow-2xs',
+                isSimulatingThisTrip
+                  ? 'bg-emerald-50 hover:bg-emerald-100 text-[#059447] border border-emerald-300'
+                  : 'bg-slate-50 hover:bg-slate-100 text-slate-600 border border-dashed border-slate-300'
+              )}
             >
-              <RefreshCw size={12} className="animate-spin duration-3000" />
-              <span>Dev: simulate next tracking state ({trip.trackingState})</span>
+              <RefreshCw size={13} className={cn('text-[#059447]', isSimulatingThisTrip ? 'animate-spin' : '')} />
+              <span>
+                {isSimulatingThisTrip
+                  ? `Dev: Navigating ${activeSimulation.phase === 'pickup' ? 'to pickup (30s)' : 'to destination (30s)'} — ${activeSimulation.remainingSec}s left (Click to Skip)`
+                  : `Dev: Simulate Live Navigation (${isPrePickup ? '30s Pickup' : '30s Customer Delivery'})`}
+              </span>
             </button>
           )}
         </div>

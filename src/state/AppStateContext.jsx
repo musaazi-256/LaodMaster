@@ -328,18 +328,134 @@ export function AppStateProvider({ children, session = defaultSession }) {
     setDismissedRequestId(incomingRequestRaw?.id ?? null);
   }, [incomingRequestRaw]);
 
+  // ---- Real-time Trip Navigation Simulation ----
+  const [activeSimulation, setActiveSimulation] = useState(null);
+
+  const startTripSimulation = useCallback((tripId, phase = 'pickup', customDuration) => {
+    const duration = customDuration ?? 30;
+    setActiveSimulation({
+      tripId,
+      phase,
+      duration,
+      startTime: performance.now(),
+      progress: 0,
+      remainingSec: duration,
+      isRunning: true,
+    });
+  }, []);
+
+  const stopTripSimulation = useCallback(() => {
+    setActiveSimulation(null);
+  }, []);
+
+  useEffect(() => {
+    if (!activeSimulation || !activeSimulation.isRunning) return undefined;
+
+    let animId;
+    const tick = () => {
+      const now = performance.now();
+      const elapsed = (now - activeSimulation.startTime) / 1000;
+      const duration = activeSimulation.duration;
+      const progress = Math.min(1.0, elapsed / duration);
+      const remainingSec = Math.max(0, Math.ceil(duration - elapsed));
+
+      if (progress >= 1.0) {
+        const tripId = activeSimulation.tripId;
+        const phase = activeSimulation.phase;
+        setActiveSimulation(null);
+
+        if (phase === 'pickup') {
+          api.updateTracking(tripId, 'driver_arrived').then(() => {
+            refetchCustomerActiveTrip();
+            refetchDriverActiveTrip();
+          });
+        } else if (phase === 'delivery') {
+          api.updateTracking(tripId, 'arrived').then(() => {
+            refetchCustomerActiveTrip();
+            refetchDriverActiveTrip();
+          });
+        }
+      } else {
+        if (
+          activeSimulation.phase === 'delivery' &&
+          progress >= 0.7 &&
+          activeSimulation.currentTrackingState !== 'near_destination'
+        ) {
+          api.updateTracking(activeSimulation.tripId, 'near_destination').then(() => {
+            refetchCustomerActiveTrip();
+            refetchDriverActiveTrip();
+          });
+        }
+        setActiveSimulation((prev) => (prev ? { ...prev, progress, remainingSec } : null));
+        animId = requestAnimationFrame(tick);
+      }
+    };
+
+    animId = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(animId);
+  }, [
+    activeSimulation?.tripId,
+    activeSimulation?.phase,
+    activeSimulation?.startTime,
+    activeSimulation?.isRunning,
+    activeSimulation?.duration,
+    refetchCustomerActiveTrip,
+    refetchDriverActiveTrip,
+  ]);
+
+  const advanceTrackingWithSimulation = useCallback(
+    async (tripId, currentState) => {
+      if (activeSimulation?.tripId === tripId && activeSimulation?.isRunning) {
+        const phase = activeSimulation.phase;
+        setActiveSimulation(null);
+        if (phase === 'pickup') {
+          await api.updateTracking(tripId, 'driver_arrived');
+        } else if (phase === 'delivery') {
+          await api.updateTracking(tripId, 'arrived');
+        }
+        await Promise.all([refetchCustomerActiveTrip(), refetchDriverActiveTrip()]);
+        return;
+      }
+
+      if (currentState === 'searching' || currentState === 'driver_assigned') {
+        await api.updateTracking(tripId, 'driver_approaching');
+        await Promise.all([refetchCustomerActiveTrip(), refetchDriverActiveTrip()]);
+        startTripSimulation(tripId, 'pickup');
+      } else if (currentState === 'driver_approaching') {
+        startTripSimulation(tripId, 'pickup');
+      } else if (currentState === 'driver_arrived') {
+        await api.updateTracking(tripId, 'en_route');
+        await Promise.all([refetchCustomerActiveTrip(), refetchDriverActiveTrip()]);
+        startTripSimulation(tripId, 'delivery', 30);
+      } else if (
+        currentState === 'trip_started' ||
+        currentState === 'en_route' ||
+        currentState === 'near_destination'
+      ) {
+        startTripSimulation(tripId, 'delivery', 30);
+      } else if (currentState === 'arrived') {
+        await api.updateTracking(tripId, 'completed');
+        await Promise.all([refetchCustomerActiveTrip(), refetchDriverActiveTrip()]);
+      } else {
+        const idx = TRACKING_STATES.indexOf(currentState);
+        const next = TRACKING_STATES[Math.min(idx + 1, TRACKING_STATES.length - 1)];
+        await api.updateTracking(tripId, next);
+        await Promise.all([refetchCustomerActiveTrip(), refetchDriverActiveTrip()]);
+      }
+    },
+    [activeSimulation, startTripSimulation, refetchCustomerActiveTrip, refetchDriverActiveTrip]
+  );
+
   const advanceDriverPhase = useCallback(async () => {
     if (!driverActiveTripRaw) return;
-    const currentPhase = PHASE_FOR_TRACKING[driverActiveTripRaw.trackingState] || 'navigate_to_pickup';
-    const idx = PHASE_ORDER.indexOf(currentPhase);
-    const nextPhase = PHASE_ORDER[Math.min(idx + 1, PHASE_ORDER.length - 1)];
-    await api.updateTracking(driverActiveTripRaw.id, TRACKING_FOR_PHASE[nextPhase]);
-    await refetchDriverActiveTrip();
-  }, [driverActiveTripRaw, refetchDriverActiveTrip]);
+    const currentState = driverActiveTripRaw.trackingState;
+    await advanceTrackingWithSimulation(driverActiveTripRaw.id, currentState);
+  }, [driverActiveTripRaw, advanceTrackingWithSimulation]);
 
   const completeDriverTrip = useCallback(
     async (rating) => {
       if (!driverActiveTripRaw) return;
+      setActiveSimulation(null);
       await api.completeTrip(driverActiveTripRaw.id, rating);
       await Promise.all([refetchDriverProfile(), refetchDriverTrips(), refetchDriverTransactions(), refetchDriverActiveTrip()]);
     },
@@ -389,6 +505,9 @@ export function AppStateProvider({ children, session = defaultSession }) {
   const value = useMemo(
     () => ({
       auth: { user: authUser, error: authError, busy: authBusy, signup, login, logout, deleteAccount },
+      activeSimulation,
+      startTripSimulation,
+      stopTripSimulation,
       customer: {
         profile: customerProfileResolved,
         wallet: customerProfileResolved?.walletBalance ?? customerProfileResolved?.wallet_balance ?? 0,
@@ -403,12 +522,15 @@ export function AppStateProvider({ children, session = defaultSession }) {
         activeTrip: customerActiveTrip,
         refetchActiveTrip: refetchCustomerActiveTrip,
         confirmTrip,
-        advanceTracking,
+        advanceTracking: advanceTrackingWithSimulation,
         cancelTrip,
         topUpWallet,
         withdraw: withdrawFromWallet,
         addPaymentMethod,
         updateProfile: updateCustomerProfile,
+        activeSimulation,
+        startTripSimulation,
+        stopTripSimulation,
       },
       driver: {
         profile: driverProfileResolved,
@@ -428,6 +550,9 @@ export function AppStateProvider({ children, session = defaultSession }) {
         submitForReview,
         updateProfile: updateDriverProfile,
         withdraw,
+        activeSimulation,
+        startTripSimulation,
+        stopTripSimulation,
       },
       getTruckTier,
       devicePlatform,
@@ -438,10 +563,11 @@ export function AppStateProvider({ children, session = defaultSession }) {
       authUser, authError, authBusy, signup, login, logout, deleteAccount,
       customerProfileResolved, customerTransactionsData, paymentMethodsData, customerTripsData, recentDestinations,
       requestDraft, updateDraft, resetDraft, fareForDraft, customerActiveTrip, refetchCustomerActiveTrip,
-      confirmTrip, advanceTracking, cancelTrip, topUpWallet, withdrawFromWallet, addPaymentMethod, updateCustomerProfile,
+      confirmTrip, advanceTrackingWithSimulation, cancelTrip, topUpWallet, withdrawFromWallet, addPaymentMethod, updateCustomerProfile,
       driverProfileResolved, driverDocumentsData, driverTripsData, driverTransactionsData, incomingRequest, driverActiveTrip,
       goOnline, goOffline, acceptRequest, declineRequest, advanceDriverPhase, completeDriverTrip,
       registerVehicle, uploadDocument, submitForReview, updateDriverProfile, withdraw,
+      activeSimulation, startTripSimulation, stopTripSimulation,
     ]
   );
 

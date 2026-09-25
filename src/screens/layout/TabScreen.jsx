@@ -5,7 +5,7 @@ import BottomNav from '../../components/navigation/BottomNav';
 // BottomNav, both inside the PhoneFrame.
 export default function TabScreen({ header, navItems, contentClassName = '', children }) {
   return (
-    <div className="flex flex-col h-full min-h-0">
+    <div className="flex flex-col flex-1 min-h-0">
       {header}
       <div className={`flex-1 overflow-y-auto px-4 py-4 ${contentClassName}`}>{children}</div>
       <BottomNav items={navItems} />

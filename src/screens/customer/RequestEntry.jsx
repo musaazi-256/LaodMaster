@@ -1,10 +1,12 @@
 import { useEffect, useRef, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import { ArrowLeft, MapPin, Target, Check, Search, X, Clock, LocateFixed } from 'lucide-react';
+import { ArrowLeft, MapPin, Target, Check, Search, X, Clock, LocateFixed, Loader2 } from 'lucide-react';
 import { useAppState } from '../../state/AppStateContext';
 import MapCanvas from '../../components/logistics/MapCanvas';
 import { LOCATION_SUGGESTIONS } from '../../mock-data/users';
 import { cn } from '../../lib/utils';
+import { searchPlaces, registerResolvedPlace } from '../../lib/geo';
+import { useLiveDemoSim } from '../LiveDemo';
 
 const RECENT_DESTINATIONS = [
   { label: 'Entebbe, kitooro', subtitle: 'Entebbe, Uganda' },
@@ -29,6 +31,9 @@ export default function RequestEntry() {
   const [params, setParams] = useSearchParams();
   const { customer } = useAppState();
   const { draft, updateDraft } = customer;
+  // Only set when rendered inside the Live Demo, whose simulation controls let the demo
+  // configure map density for testing; a real customer session just gets the defaults.
+  const demoSim = useLiveDemoSim();
 
   // In-place Search Modal Drawer State
   const initialField = params.get('field');
@@ -36,6 +41,8 @@ export default function RequestEntry() {
     initialField === 'pickup' || initialField === 'destination' ? initialField : null
   );
   const [searchQuery, setSearchQuery] = useState('');
+  const [liveResults, setLiveResults] = useState([]);
+  const [isSearching, setIsSearching] = useState(false);
 
   // The map needs to know how much of its bottom edge this sheet actually covers so it can
   // keep pins clear of it — a hardcoded guess drifts out of sync the moment this card's
@@ -63,6 +70,35 @@ export default function RequestEntry() {
     }
   }, [params]);
 
+  // Free-text location search: as the user types, look up real places worldwide via OSM's
+  // Nominatim geocoder instead of only matching against the small curated suggestion list.
+  // Debounced so we don't fire a request per keystroke, and aborted on cleanup so a stale
+  // response from an earlier keystroke can't overwrite a newer one.
+  useEffect(() => {
+    const query = searchQuery.trim();
+    if (query.length < 2) {
+      setLiveResults([]);
+      setIsSearching(false);
+      return undefined;
+    }
+    const controller = new AbortController();
+    setIsSearching(true);
+    const timer = setTimeout(async () => {
+      try {
+        const results = await searchPlaces(query, { signal: controller.signal });
+        setLiveResults(results);
+      } catch (err) {
+        if (err.name !== 'AbortError') setLiveResults([]);
+      } finally {
+        if (!controller.signal.aborted) setIsSearching(false);
+      }
+    }, 350);
+    return () => {
+      clearTimeout(timer);
+      controller.abort();
+    };
+  }, [searchQuery]);
+
   const pickupText = draft.pickup?.label || '';
   const destinationText = draft.destination?.label || '';
   const canContinue = Boolean(pickupText && destinationText);
@@ -82,6 +118,9 @@ export default function RequestEntry() {
 
   function selectLocation(loc) {
     if (activeSearchField) {
+      if (typeof loc.lng === 'number' && typeof loc.lat === 'number') {
+        registerResolvedPlace(loc.label, [loc.lng, loc.lat]);
+      }
       updateDraft({ [activeSearchField]: loc });
     }
     closeSearchDrawer();
@@ -111,8 +150,19 @@ export default function RequestEntry() {
       )
     : [];
 
+  // Real geocoded matches first, then any curated suggestions not already covered by them —
+  // keeps the well-known local shortcuts useful while making search otherwise unrestricted.
+  const combinedResults = searchQuery
+    ? [
+        ...liveResults,
+        ...filteredSuggestions.filter(
+          (s) => !liveResults.some((r) => r.label.toLowerCase() === s.label.toLowerCase())
+        ),
+      ]
+    : [];
+
   return (
-    <div className="relative w-full h-full min-h-0 flex flex-col justify-between overflow-hidden font-sans bg-slate-100">
+    <div className="relative w-full flex-1 min-h-0 flex flex-col justify-between overflow-hidden font-sans bg-slate-100">
       {/* BACKGROUND MAP CANVAS - Fills 100% viewport */}
       <div className="absolute inset-0 z-0">
         <MapCanvas
@@ -121,6 +171,8 @@ export default function RequestEntry() {
           destinationLabel={destinationText || 'Destination'}
           fullBleed
           visiblePadding={{ top: 105, bottom: sheetHeight, left: 36, right: 36 }}
+          nearbyTruckCount={demoSim?.nearbyTruckCount}
+          truckStatusMix={demoSim?.truckStatusMix}
         />
       </div>
 
@@ -364,21 +416,34 @@ export default function RequestEntry() {
             {/* Suggestions & Recent List */}
             <div className="flex-1 overflow-y-auto max-h-[38vh] flex flex-col gap-1 pt-1 no-scrollbar">
               {searchQuery ? (
-                filteredSuggestions.length > 0 ? (
-                  filteredSuggestions.map((s) => (
-                    <button
-                      key={s.id}
-                      type="button"
-                      onClick={() => selectLocation(s)}
-                      className="w-full flex items-center gap-3 py-2.5 px-2 hover:bg-neutral-50 rounded-lg text-left transition-colors"
-                    >
-                      <MapPin size={18} className="text-neutral-400 shrink-0" />
-                      <div className="flex flex-col min-w-0">
-                        <span className="text-[13.5px] font-medium text-neutral-900 truncate">{s.label}</span>
-                        {s.subtitle && <span className="text-[11.5px] text-neutral-500 truncate">{s.subtitle}</span>}
+                combinedResults.length > 0 ? (
+                  <>
+                    {combinedResults.map((s) => (
+                      <button
+                        key={s.id}
+                        type="button"
+                        onClick={() => selectLocation(s)}
+                        className="w-full flex items-center gap-3 py-2.5 px-2 hover:bg-neutral-50 rounded-lg text-left transition-colors"
+                      >
+                        <MapPin size={18} className="text-neutral-400 shrink-0" />
+                        <div className="flex flex-col min-w-0">
+                          <span className="text-[13.5px] font-medium text-neutral-900 truncate">{s.label}</span>
+                          {s.subtitle && <span className="text-[11.5px] text-neutral-500 truncate">{s.subtitle}</span>}
+                        </div>
+                      </button>
+                    ))}
+                    {isSearching && (
+                      <div className="flex items-center gap-2 py-2.5 px-2 text-[12px] text-neutral-400">
+                        <Loader2 size={14} className="animate-spin" />
+                        Searching for more…
                       </div>
-                    </button>
-                  ))
+                    )}
+                  </>
+                ) : isSearching ? (
+                  <div className="flex items-center justify-center gap-2 py-6 text-[13px] text-neutral-400">
+                    <Loader2 size={16} className="animate-spin" />
+                    Searching…
+                  </div>
                 ) : (
                   <div className="py-6 text-center text-[13px] text-neutral-400">
                     No matching locations found

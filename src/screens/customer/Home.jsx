@@ -10,6 +10,10 @@ import {
   Wallet,
   ArrowDownToLine,
   ArrowUpFromLine,
+  Clock,
+  Phone,
+  MessageSquare,
+  Navigation,
 } from 'lucide-react';
 import TabScreen from '../layout/TabScreen';
 import { CUSTOMER_NAV_ITEMS } from '../layout/navItems';
@@ -17,11 +21,10 @@ import { useAppState } from '../../state/AppStateContext';
 import { formatUGX } from '../../lib/format';
 import Avatar from '../../components/identity/Avatar';
 import MapCanvas from '../../components/logistics/MapCanvas';
-import ETACard from '../../components/logistics/ETACard';
-import DriverCard from '../../components/logistics/DriverCard';
-import Button from '../../components/actions/Button';
 import Logo from '../../components/identity/Logo';
 import { Card } from '../../components/ui/card';
+import Button from '../../components/actions/Button';
+import { useToast } from '../../components/feedback/ToastProvider';
 
 // Clean Truck Vector Illustrations for the 5 tiers
 function TruckGraphic({ type = 'small' }) {
@@ -87,8 +90,9 @@ const TRUCK_SIZES = [
 
 export default function Home() {
   const navigate = useNavigate();
+  const showToast = useToast();
   const { customer } = useAppState();
-  const { profile, activeTrip, resetDraft, updateDraft } = customer;
+  const { profile, activeTrip, resetDraft, updateDraft, activeSimulation } = customer;
   const selectedLocation = 'Kampala';
 
   if (!profile) return null;
@@ -101,24 +105,141 @@ export default function Home() {
 
   const firstName = profile.name ? profile.name.split(' ')[0] : 'John';
 
+  if (activeTrip) {
+    const isSimulatingThisTrip = activeSimulation?.tripId === activeTrip.id && activeSimulation?.isRunning;
+    const progressOverride = isSimulatingThisTrip ? activeSimulation.progress : undefined;
+
+    const driver = activeTrip.driver || {
+      name: 'Ahmed Hassan',
+      rating: 4.8,
+      tripCount: 12,
+      vehicleModel: 'Isuzu NPR',
+      plateNumber: 'UAW 123X',
+      phone: '+256712345001',
+    };
+
+    return (
+      <TabScreen navItems={CUSTOMER_NAV_ITEMS} contentClassName="p-0 overflow-hidden relative">
+        <div className="absolute inset-0 flex flex-col justify-between overflow-hidden font-sans bg-slate-100">
+          {/* BACKGROUND FULL-BLEED MAP CANVAS */}
+          <div className="absolute inset-0 z-0">
+            <MapCanvas
+              state={activeTrip.trackingState}
+              originLabel={activeTrip.origin}
+              destinationLabel={activeTrip.destination}
+              fullBleed
+              visiblePadding={{ top: 90, bottom: 250, left: 24, right: 24 }}
+              progressOverride={progressOverride}
+            />
+          </div>
+
+          {/* TOP FLOATING HEADER BAR */}
+          <div className="relative z-20 pt-8 px-4 flex items-center justify-between pointer-events-none">
+            {/* Brand Logo */}
+            <div className="bg-white/95 backdrop-blur-md shadow-md rounded-full px-3.5 py-1.5 border border-neutral-200/80 flex items-center gap-2 pointer-events-auto">
+              <Logo size="h-6" />
+            </div>
+
+            {/* Status & Order Pill */}
+            <div className="flex flex-col text-right pointer-events-auto bg-white/90 backdrop-blur-md px-3.5 py-1.5 rounded-2xl border border-neutral-200/60 shadow-xs">
+              <span className="text-[13.5px] font-extrabold text-[#020617] leading-tight tracking-tight">
+                {firstName}'s truck is on the way
+              </span>
+              <span className="text-[10.5px] font-semibold text-[#64748B]">
+                Order #{activeTrip.id.slice(0, 8)}
+              </span>
+            </div>
+          </div>
+
+          {/* BOTTOM SHEET DRIVER & TRACKING PANEL */}
+          <div className="relative z-20 w-full bg-white rounded-t-[28px] shadow-[0_-8px_30px_rgba(0,0,0,0.12)] p-4 pb-5 flex flex-col gap-3.5 border-t border-neutral-200/80 shrink-0">
+            {/* DRAG HANDLE PILL */}
+            <div className="w-[48px] h-[5px] bg-[#94A3B8]/40 rounded-full mx-auto" />
+
+            {/* DRIVER INFO & STATUS CARD */}
+            <div className="bg-[#F8FAFC] rounded-[20px] p-3.5 border border-slate-200/80 flex flex-col gap-3">
+              <div className="flex items-center justify-between gap-3">
+                <div className="flex items-center gap-3 min-w-0 flex-1">
+                  <div className="relative shrink-0">
+                    <div className="w-11 h-11 rounded-full bg-emerald-100 text-[#059447] border-2 border-white flex items-center justify-center font-bold text-[14px]">
+                      {driver.name ? driver.name.split(' ').map((n) => n[0]).join('') : 'AH'}
+                    </div>
+                    <span className="absolute bottom-0 right-0 w-3.5 h-3.5 rounded-full bg-[#059447] border-2 border-white" />
+                  </div>
+                  <div className="flex flex-col text-left min-w-0">
+                    <div className="flex items-center gap-1.5">
+                      <span className="text-[14px] font-bold text-[#0F172A] truncate">
+                        {driver.name}
+                      </span>
+                      <span className="text-[11px] font-semibold text-[#059447] bg-emerald-50 border border-emerald-200 rounded-md px-1.5 py-0.2 shrink-0">
+                        ★ {driver.rating || 4.8}
+                      </span>
+                    </div>
+                    <span className="text-[11.5px] font-medium text-[#64748B] truncate mt-0.5">
+                      {driver.vehicleModel || 'Isuzu NPR'} · <strong className="text-[#0F172A] font-bold">{driver.plateNumber || 'UAW 123X'}</strong>
+                    </span>
+                  </div>
+                </div>
+
+                {/* Call & Message Action Buttons */}
+                <div className="flex items-center gap-2 shrink-0">
+                  <button
+                    type="button"
+                    onClick={() => showToast(`Calling ${driver.name}…`, 'info')}
+                    className="w-9 h-9 rounded-full bg-[#E8F7EF] hover:bg-[#d5f2e2] text-[#059447] border border-[#50BB7F]/30 flex items-center justify-center transition-all cursor-pointer active:scale-95"
+                    aria-label="Call driver"
+                  >
+                    <Phone size={16} />
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => showToast('Opening message chat…', 'info')}
+                    className="w-9 h-9 rounded-full bg-slate-100 hover:bg-slate-200 text-slate-700 border border-slate-200 flex items-center justify-center transition-all cursor-pointer active:scale-95"
+                    aria-label="Message driver"
+                  >
+                    <MessageSquare size={16} />
+                  </button>
+                </div>
+              </div>
+
+              {/* TRIP STATUS & ETA BAR */}
+              <div className="flex items-center gap-2.5 bg-white rounded-2xl border border-slate-200/90 px-3 py-2 shadow-2xs">
+                <div className="w-7 h-7 rounded-full bg-emerald-50 border border-emerald-200 flex items-center justify-center text-[#059447] shrink-0">
+                  <Clock size={15} />
+                </div>
+                <div className="flex flex-col text-left min-w-0">
+                  <span className="text-[12px] font-bold text-[#0F172A] leading-tight truncate">
+                    {isSimulatingThisTrip
+                      ? activeSimulation.phase === 'pickup'
+                        ? `Driver arriving in ~${activeSimulation.remainingSec}s (Live)`
+                        : `ETA ~${activeSimulation.remainingSec}s remaining (Live)`
+                      : `Arriving in ${activeTrip.etaMinutes ?? 6} mins · ${activeTrip.distanceKm ?? 2.1} km`}
+                  </span>
+                  <span className="text-[10.5px] font-normal text-[#64748B] leading-tight truncate mt-0.5">
+                    Driver is approaching your pickup spot
+                  </span>
+                </div>
+              </div>
+            </div>
+
+            {/* TRACK TRIP PRIMARY ACTION BUTTON */}
+            <button
+              type="button"
+              onClick={() => navigate(`/customer/tracking/${activeTrip.id}`)}
+              className="w-full h-12 bg-[#059447] hover:bg-[#047857] active:scale-[0.99] text-white font-extrabold text-[15px] rounded-[14px] flex items-center justify-center gap-2 shadow-md transition-all cursor-pointer"
+            >
+              <Navigation size={18} />
+              <span>Track Trip</span>
+            </button>
+          </div>
+        </div>
+      </TabScreen>
+    );
+  }
+
   return (
     <TabScreen navItems={CUSTOMER_NAV_ITEMS}>
-      {activeTrip ? (
-        <div className="flex flex-col gap-4">
-          <div>
-            <p className="text-h3 text-neutral-900">
-              {firstName}, your truck is on the way
-            </p>
-          </div>
-          <MapCanvas state={activeTrip.trackingState} originLabel={activeTrip.origin} destinationLabel={activeTrip.destination} />
-          {activeTrip.driver && <DriverCard driver={activeTrip.driver} onCall={() => {}} onChat={() => {}} />}
-          <ETACard etaMinutes={activeTrip.etaMinutes} distanceKm={activeTrip.distanceKm} />
-          <Button size="lg" fullWidth onClick={() => navigate(`/customer/tracking/${activeTrip.id}`)}>
-            Track Trip
-          </Button>
-        </div>
-      ) : (
-        <div className="flex flex-col gap-4 pb-2">
+      <div className="flex flex-col gap-4 pb-2">
           {/* BRAND HEADER BAR */}
           <div className="flex items-center justify-between pt-1 pb-1">
             <Logo size="h-8" showTagline />
@@ -351,7 +472,6 @@ export default function Home() {
             </div>
           </div>
         </div>
-      )}
     </TabScreen>
   );
 }

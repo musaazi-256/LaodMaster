@@ -36,6 +36,16 @@ function normalize(label) {
   return String(label ?? '').toLowerCase().trim();
 }
 
+// Coordinates a caller already knows exactly — e.g. a geocoding search result or a real GPS
+// fix — registered against the label text so `resolvePlace` returns the real point instead of
+// falling through to the dictionary/hash approximation below.
+const resolvedCoords = new Map();
+
+export function registerResolvedPlace(label, coord) {
+  const key = normalize(label);
+  if (key && Array.isArray(coord)) resolvedCoords.set(key, coord);
+}
+
 function hashString(str) {
   let hash = 0;
   for (let i = 0; i < str.length; i++) {
@@ -63,6 +73,7 @@ function hashPoint(key) {
 export function resolvePlace(label) {
   const key = normalize(label);
   if (!key) return hashPoint('fallback');
+  if (resolvedCoords.has(key)) return resolvedCoords.get(key);
   if (KNOWN_PLACES[key]) return KNOWN_PLACES[key];
 
   // Labels are commonly "Specific place, general area" (e.g. "Ntinda, Kampala").
@@ -79,6 +90,25 @@ export function resolvePlace(label) {
   const match = Object.keys(KNOWN_PLACES).find((k) => key.includes(k) || k.includes(key));
   if (match) return KNOWN_PLACES[match];
   return hashPoint(key);
+}
+
+// Offsets `origin` [lng, lat] by `distanceKm` along `bearingDeg` (0 = north, 90 = east,
+// clockwise), correcting for the latitude-dependent compression of longitude degrees so the
+// result is accurate anywhere on the globe, not just near the equator.
+function offsetByBearing([lng, lat], bearingDeg, distanceKm) {
+  const latRad = (lat * Math.PI) / 180;
+  const bearingRad = (bearingDeg * Math.PI) / 180;
+  const kmPerDegLat = 110.574;
+  const kmPerDegLng = 111.32 * Math.cos(latRad);
+  const dLat = (distanceKm * Math.cos(bearingRad)) / kmPerDegLat;
+  const dLng = kmPerDegLng > 0.0001 ? (distanceKm * Math.sin(bearingRad)) / kmPerDegLng : 0;
+  return [lng + dLng, lat + dLat];
+}
+
+// A deterministic point a given distance/bearing from `origin` — used to place "nearby truck"
+// markers a realistic distance from wherever the customer is actually requesting from.
+export function pointAtBearing(origin, bearingDeg, distanceKm) {
+  return offsetByBearing(origin, bearingDeg, distanceKm);
 }
 
 // A plausible "driver's current location" a short distance from the pickup
@@ -166,6 +196,69 @@ export function sliceRoute(coords, t) {
   }
   if (point) result.push([point.lng, point.lat]);
   return result;
+}
+
+// Returns the trailing slice of `coords` covering the last (1 - t) fraction of cumulative
+// distance — the complement of `sliceRoute`. Used to draw only the not-yet-covered portion of
+// a route ahead of a moving marker, so the covered portion behind it disappears instead of
+// staying drawn.
+export function remainingRoute(coords, t) {
+  if (!coords || coords.length < 2) return coords ?? [];
+  if (t >= 1) return [coords[coords.length - 1]];
+  if (t <= 0) return coords;
+
+  const point = pointAlongRoute(coords, t);
+  const segLengths = [];
+  let total = 0;
+  for (let i = 0; i < coords.length - 1; i++) {
+    const d = haversine(coords[i], coords[i + 1]);
+    segLengths.push(d);
+    total += d;
+  }
+  const target = t * total;
+  let covered = 0;
+  let startIdx = coords.length - 1;
+  for (let i = 0; i < segLengths.length; i++) {
+    covered += segLengths[i];
+    if (covered >= target) {
+      startIdx = i + 1;
+      break;
+    }
+  }
+  const result = point ? [[point.lng, point.lat]] : [];
+  result.push(...coords.slice(startIdx));
+  return result;
+}
+
+const searchCache = new Map();
+
+// Free-text place search via OpenStreetMap's public Nominatim geocoder (no API key needed) —
+// the same open-data source already backing the map tiles (OpenFreeMap) and routing (OSRM),
+// so search isn't limited to the small curated KNOWN_PLACES dictionary above. Results carry
+// their real [lng, lat], meant to be registered with `registerResolvedPlace` once selected.
+export async function searchPlaces(query, { signal } = {}) {
+  const key = normalize(query);
+  if (key.length < 2) return [];
+  if (searchCache.has(key)) return searchCache.get(key);
+
+  try {
+    const url = `https://nominatim.openstreetmap.org/search?format=jsonv2&addressdetails=1&limit=8&q=${encodeURIComponent(query)}`;
+    const res = await fetch(url, { signal, headers: { Accept: 'application/json' } });
+    if (!res.ok) throw new Error(`Nominatim ${res.status}`);
+    const data = await res.json();
+    const results = data.map((item) => ({
+      id: `osm-${item.place_id}`,
+      label: (item.name || item.display_name.split(',')[0]).trim(),
+      subtitle: item.display_name,
+      lng: parseFloat(item.lon),
+      lat: parseFloat(item.lat),
+    }));
+    searchCache.set(key, results);
+    return results;
+  } catch (err) {
+    if (err.name === 'AbortError') throw err;
+    return [];
+  }
 }
 
 const routeCache = new Map();

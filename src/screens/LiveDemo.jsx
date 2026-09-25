@@ -9,6 +9,9 @@ import {
   Lightbulb,
   FileText,
   Sparkles,
+  Truck,
+  Minus,
+  Plus,
 } from 'lucide-react';
 import { authRoutes, customerRoutes, driverRoutes } from '../routes/routeGroups';
 import { AppStateProvider } from '../state/AppStateContext';
@@ -21,6 +24,15 @@ export const LiveDemoDeviceContext = createContext(null);
 
 export function useLiveDemoDevice() {
   return useContext(LiveDemoDeviceContext);
+}
+
+// Lets screens rendered inside the Live Demo (e.g. RequestEntry's nearby-trucks map) read the
+// simulation controls above the phone panes, without prop-drilling them through every route.
+// `null` outside Live Demo, so consumers fall back to their own defaults.
+export const LiveDemoSimContext = createContext(null);
+
+export function useLiveDemoSim() {
+  return useContext(LiveDemoSimContext);
 }
 
 function CustomerPaneRoutes() {
@@ -43,6 +55,12 @@ export default function LiveDemo() {
   const [driverRoute, setDriverRoute] = useState('/splash');
   const [driverKey, setDriverKey] = useState(0);
 
+  // Map simulation controls, shared above both phone panes — currently only the Customer
+  // pane's "nearby trucks" idle-state map reads these, but they're exposed to both in case
+  // future demo screens want them too.
+  const [nearbyTruckCount, setNearbyTruckCount] = useState(3);
+  const [truckStatusMix, setTruckStatusMix] = useState('available'); // 'available' | 'mixed'
+
   function setCustomerPath(path) {
     setCustomerRoute(path);
     setCustomerKey((k) => k + 1);
@@ -55,6 +73,7 @@ export default function LiveDemo() {
 
   return (
     <LiveDemoDeviceContext.Provider value={{ platform: demoPlatform, setPlatform: setDemoPlatform }}>
+    <LiveDemoSimContext.Provider value={{ nearbyTruckCount, setNearbyTruckCount, truckStatusMix, setTruckStatusMix }}>
       <div className="min-h-screen bg-white flex flex-col antialiased">
         {/* TOP HEADER NAVBAR */}
         <header className="sticky top-0 z-50 bg-white border-b border-neutral-200 shadow-1">
@@ -272,6 +291,78 @@ export default function LiveDemo() {
 
           {/* RIGHT INTERACTIVE DUAL PHONE DEMO AREA (~70% width) */}
           <main className="flex-1 bg-neutral-100/70 p-6 lg:p-10 flex items-center justify-center overflow-x-auto min-h-[calc(100vh-70px)]">
+            <div className="flex flex-col items-center gap-5 w-full">
+              {/* MAP SIMULATION CONTROLS — shared above both phone panes */}
+              <div className="w-full max-w-2xl bg-white border border-neutral-200 rounded-card shadow-1 px-5 py-4 flex flex-wrap items-center gap-x-8 gap-y-3">
+                <div className="flex items-center gap-2 text-neutral-900 font-semibold text-body-sm shrink-0">
+                  <Truck size={16} className="text-green-700" />
+                  Map simulation
+                </div>
+
+                {/* Nearby truck count */}
+                <div className="flex items-center gap-3">
+                  <span className="text-small text-neutral-500">Nearby trucks</span>
+                  <div className="flex items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setNearbyTruckCount((n) => Math.max(0, n - 1))}
+                      className="w-7 h-7 rounded-full border border-neutral-300 flex items-center justify-center text-neutral-600 hover:bg-neutral-100 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+                      disabled={nearbyTruckCount <= 0}
+                      aria-label="Decrease nearby truck count"
+                    >
+                      <Minus size={13} />
+                    </button>
+                    <span className="w-5 text-center font-semibold text-neutral-900 text-body-sm tabular-nums">
+                      {nearbyTruckCount}
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => setNearbyTruckCount((n) => Math.min(8, n + 1))}
+                      className="w-7 h-7 rounded-full border border-neutral-300 flex items-center justify-center text-neutral-600 hover:bg-neutral-100 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+                      disabled={nearbyTruckCount >= 8}
+                      aria-label="Increase nearby truck count"
+                    >
+                      <Plus size={13} />
+                    </button>
+                  </div>
+                </div>
+
+                {/* Truck status mix */}
+                <div className="flex items-center gap-3">
+                  <span className="text-small text-neutral-500">Truck statuses</span>
+                  <div className="flex items-center rounded-pill border border-neutral-200 p-0.5 bg-neutral-50">
+                    <button
+                      type="button"
+                      onClick={() => setTruckStatusMix('available')}
+                      className={cx(
+                        'px-3 py-1 rounded-pill text-[11px] font-semibold transition-all',
+                        truckStatusMix === 'available'
+                          ? 'bg-neutral-900 text-white shadow-sm'
+                          : 'text-neutral-600 hover:text-neutral-900'
+                      )}
+                    >
+                      All available
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setTruckStatusMix('mixed')}
+                      className={cx(
+                        'px-3 py-1 rounded-pill text-[11px] font-semibold transition-all',
+                        truckStatusMix === 'mixed'
+                          ? 'bg-neutral-900 text-white shadow-sm'
+                          : 'text-neutral-600 hover:text-neutral-900'
+                      )}
+                    >
+                      Mixed statuses
+                    </button>
+                  </div>
+                </div>
+
+                <span className="text-[11px] text-neutral-400 ml-auto">
+                  Applies to the Customer App&apos;s pickup map
+                </span>
+              </div>
+
             <div className="flex flex-wrap items-start justify-center gap-8 lg:gap-12 py-4">
               {/* Customer App Pane */}
               <div className="flex flex-col items-center">
@@ -386,9 +477,11 @@ export default function LiveDemo() {
                 </AppStateProvider>
               </div>
             </div>
+            </div>
           </main>
         </div>
       </div>
+    </LiveDemoSimContext.Provider>
     </LiveDemoDeviceContext.Provider>
   );
 }

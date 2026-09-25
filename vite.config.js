@@ -25,4 +25,14 @@ export default defineConfig({
       },
     },
   },
+  // `vite preview` (serving the production build locally) reads its own proxy config,
+  // not `server.proxy` above — without this, the built app 404s on every /api call.
+  preview: {
+    proxy: {
+      '/api': {
+        target: 'http://localhost:4000',
+        changeOrigin: true,
+      },
+    },
+  },
 })

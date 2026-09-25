@@ -21,7 +21,7 @@ export default function DriverTripScreen() {
   const navigate = useNavigate();
   const showToast = useToast();
   const { driver } = useAppState();
-  const { activeTrip, advanceDriverPhase } = driver;
+  const { activeTrip, advanceDriverPhase, activeSimulation } = driver;
 
   useEffect(() => {
     if (!activeTrip) navigate('/driver', { replace: true });
@@ -30,6 +30,8 @@ export default function DriverTripScreen() {
   if (!activeTrip) return null;
 
   const copy = PHASE_COPY[activeTrip.phase];
+  const isSimulatingThisTrip = activeSimulation?.tripId === activeTrip.id && activeSimulation?.isRunning;
+  const progressOverride = isSimulatingThisTrip ? activeSimulation.progress : undefined;
 
   function handlePrimaryAction() {
     if (activeTrip.phase === 'arrived_destination') {
@@ -39,11 +41,24 @@ export default function DriverTripScreen() {
     }
   }
 
+  const titleText = isSimulatingThisTrip
+    ? `Navigating ${activeSimulation.phase === 'pickup' ? 'to pickup' : 'to customer'} (${activeSimulation.remainingSec}s remaining)`
+    : copy.title;
+
+  const actionText = isSimulatingThisTrip
+    ? `Skip live simulation (${activeSimulation.remainingSec}s)`
+    : copy.action;
+
   return (
     <div className="flex flex-col h-full min-h-0">
       <TopAppBar title="Active trip" />
       <div className="flex-1 overflow-y-auto px-4 py-4 flex flex-col gap-4">
-        <MapCanvas state={activeTrip.trackingState} originLabel={activeTrip.origin} destinationLabel={activeTrip.destination} />
+        <MapCanvas
+          state={activeTrip.trackingState}
+          originLabel={activeTrip.origin}
+          destinationLabel={activeTrip.destination}
+          progressOverride={progressOverride}
+        />
 
         <div className="flex items-center gap-3 rounded-card border border-neutral-200 bg-white p-4">
           <Avatar name={activeTrip.customer?.name} />
@@ -63,9 +78,9 @@ export default function DriverTripScreen() {
         </div>
       </div>
       <div className="border-t border-neutral-200 bg-white px-4 py-3 flex flex-col gap-2">
-        <p className="text-label text-neutral-900 text-center">{copy.title}</p>
+        <p className="text-label text-neutral-900 text-center">{titleText}</p>
         <Button size="lg" fullWidth onClick={handlePrimaryAction}>
-          {copy.action}
+          {actionText}
         </Button>
       </div>
     </div>
