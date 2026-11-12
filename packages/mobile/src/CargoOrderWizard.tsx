@@ -7,7 +7,7 @@ import type { NativeStackScreenProps } from "@react-navigation/native-stack";
 import {
   money,
   methodLabels,
-  paymentMethods,
+  availablePaymentMethods,
   type CargoContact,
   type CargoItem,
   type CargoStop,
@@ -49,10 +49,7 @@ const ensureValidContact = (
   fallbackName: string,
   fallbackPhone: string,
 ): CargoContact => ({
-  name:
-    c?.name && c.name.trim().length >= 2
-      ? c.name.trim()
-      : fallbackName,
+  name: c?.name && c.name.trim().length >= 2 ? c.name.trim() : fallbackName,
   phone:
     c?.phone && /^\+?[0-9 ()-]{9,18}$/.test(c.phone.trim())
       ? c.phone.trim()
@@ -329,6 +326,10 @@ function CargoOrderWizardContent({
   const truck = data?.trucks.find((t) => t.id === truckId);
   const next = () => {
     setError(null);
+    if (step === 2 && !availablePaymentMethods(data).includes(method)) {
+      setError("Choose an available payment method before continuing.");
+      return;
+    }
     if (
       step === 0 &&
       (!quote || new Set(stops.map((s) => s.place.id)).size !== stops.length)
@@ -511,6 +512,15 @@ function CargoOrderWizardContent({
       footer={
         <>
           <ErrorBox message={error || action.error} />
+          {step >= 2 && !availablePaymentMethods(data).includes(method) && (
+            <ErrorBox
+              message={
+                availablePaymentMethods(data).length
+                  ? "Choose an available payment method. Go back to Payment & pairing to update your choice."
+                  : "Payment methods are temporarily unavailable. Please try again later."
+              }
+            />
+          )}
           {step === 3 ? (
             <>
               <Text style={[cs.heading, { textAlign: "center" }]}>
@@ -518,7 +528,11 @@ function CargoOrderWizardContent({
               </Text>
               <CargoButton
                 title={action.busy ? "Placing order…" : "Order a truck"}
-                disabled={action.busy || !quote}
+                disabled={
+                  action.busy ||
+                  !quote ||
+                  !availablePaymentMethods(data).includes(method)
+                }
                 onPress={() => void place()}
               />
             </>
@@ -1128,7 +1142,7 @@ function CargoOrderWizardContent({
               does not authorize payment.
             </Text>
           </CargoCard>
-          {paymentMethods
+          {availablePaymentMethods(data)
             .filter((m) => payer !== "recipient" || m !== "wallet")
             .map((m) => (
               <Pressable

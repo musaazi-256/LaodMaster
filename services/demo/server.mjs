@@ -70,6 +70,11 @@ export function createServer(
         res.end(readFileSync(file));
         return;
       }
+      if (req.method === "GET" && path === "/favicon.ico") {
+        res.writeHead(204);
+        res.end();
+        return;
+      }
       if (path === "/health") {
         res.end(JSON.stringify({ ok: true, mode: "demo" }));
         return;

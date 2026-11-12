@@ -12,6 +12,7 @@ import {
   ChevronRight,
   LoaderCircle,
   AlertCircle,
+  HelpCircle,
   Download,
   Plus,
   ArrowUpRight,
@@ -63,6 +64,28 @@ import {
 } from "@/components/ui/tooltip";
 import { Textarea } from "@/components/ui/textarea";
 import { csvDownload, key, title, type Row } from "@/lib/api";
+export function HelpTip({
+  label,
+  children,
+}: {
+  label: string;
+  children: ReactNode;
+}) {
+  return (
+    <Tooltip>
+      <TooltipTrigger asChild>
+        <button
+          type="button"
+          aria-label={label}
+          className="inline-flex items-center justify-center ml-2 text-muted-foreground"
+        >
+          <HelpCircle size={15} />
+        </button>
+      </TooltipTrigger>
+      <TooltipContent className="max-w-xs">{children}</TooltipContent>
+    </Tooltip>
+  );
+}
 export function Status({ value }: { value: string }) {
   return (
     <Badge variant="outline" className={"status status-" + value}>
@@ -502,6 +525,7 @@ export interface FieldSpec {
   label: string;
   type?:
     | "text"
+    | "date"
     | "email"
     | "tel"
     | "number"
@@ -513,6 +537,7 @@ export interface FieldSpec {
   value?: string | number;
   options?: { value: string; label: string }[];
   required?: boolean;
+  help?: string;
   min?: number;
   step?: string;
 }
@@ -520,6 +545,7 @@ export interface FormSpec {
   title: string;
   description?: string;
   fields: FieldSpec[];
+  preview?: (values: Row) => ReactNode;
   submit?: string;
   onSubmit: (values: Row, key: string) => Promise<void>;
 }
@@ -579,7 +605,10 @@ function FormBody({ spec, onClose }: { spec: FormSpec; onClose: () => void }) {
       <div className="form-fields">
         {spec.fields.map((f) => (
           <div className="field" key={f.name}>
-            <Label htmlFor={"form-" + f.name}>{f.label}</Label>
+            <div className="flex items-center">
+              <Label htmlFor={"form-" + f.name}>{f.label}</Label>
+              {f.help && <HelpTip label={f.label + " help"}>{f.help}</HelpTip>}
+            </div>
             {f.type === "checks" ? (
               <div className="check-list">
                 {(f.options || []).map((o) => {
@@ -639,6 +668,7 @@ function FormBody({ spec, onClose }: { spec: FormSpec; onClose: () => void }) {
           </div>
         ))}
       </div>
+      {spec.preview?.(values)}
       <ErrorNotice error={error} />
       <DialogFooter>
         <Button

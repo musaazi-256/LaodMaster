@@ -1,3 +1,4 @@
+import type { PlatformPaymentMethod } from "../../../../packages/contracts/src";
 export type Row = Record<string, any>;
 export interface AdminData {
   me: Row;
@@ -10,6 +11,7 @@ export interface AdminData {
   transfers: Row[];
   accounts: Record<string, number>;
   withdrawals: Row[];
+  paymentMethods: PlatformPaymentMethod[];
   operations: Row[];
   ledger: Row[];
   reconciliations: Row[];

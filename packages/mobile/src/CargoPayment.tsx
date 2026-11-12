@@ -6,7 +6,7 @@ import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import {
   methodLabels,
   money,
-  paymentMethods,
+  availablePaymentMethods,
   type Method,
   type Order,
   type Scenario,
@@ -17,6 +17,7 @@ import { success } from "./successes";
 import { CargoScreen, CargoCard, CargoButton, cs } from "./CargoUI";
 import { ErrorBox, Field, Icon } from "./ui";
 import { customerTheme as T } from "./customerTheme";
+import { WalletSheet } from "./WalletSheet";
 export function CargoPayment({ order: o }: { order: Order }) {
   const { client, data, account } = useDemo();
   const nav = useNavigation<NativeStackNavigationProp<RootStack>>();
@@ -28,6 +29,7 @@ export function CargoPayment({ order: o }: { order: Order }) {
     o.cargoPlan?.externalWalletName || "",
   );
   const [cash, setCash] = useState(false);
+  const [walletOpen, setWalletOpen] = useState(false);
   const paid = o.payment.status === "paid";
   const pending = ["unknown", "processing"].includes(o.payment.status);
   const recipient = o.cargoPlan?.payer === "recipient";
@@ -79,7 +81,9 @@ export function CargoPayment({ order: o }: { order: Order }) {
           ) : o.payment.status === "failed" ? (
             <CargoButton
               title="Retry payment"
-              disabled={action.busy}
+              disabled={
+                action.busy || !availablePaymentMethods(data).includes(method)
+              }
               onPress={() => run({ action: "retry", method, provider })}
             />
           ) : (
@@ -89,7 +93,11 @@ export function CargoPayment({ order: o }: { order: Order }) {
                   ? "Confirm demo card payment"
                   : "Approve demo payment"
               }
-              disabled={action.busy || o.payment.status !== "awaiting_approval"}
+              disabled={
+                action.busy ||
+                o.payment.status !== "awaiting_approval" ||
+                !availablePaymentMethods(data).includes(o.method)
+              }
               onPress={() => run({ action: "approve", scenario })}
             />
           )}
@@ -111,7 +119,14 @@ export function CargoPayment({ order: o }: { order: Order }) {
         <Text style={cs.muted}>
           {o.payment.message || "Payment follows delivery handover."}
         </Text>
+        {pending && (
+          <Text style={cs.muted}>
+            Check the existing payment before retrying. Finance can also confirm
+            it from the provider report.
+          </Text>
+        )}
       </CargoCard>
+      <WalletSheet visible={walletOpen} onClose={() => setWalletOpen(false)} />
       {recipient && !paid && (
         <CargoCard>
           <Text style={cs.heading}>
@@ -238,22 +253,31 @@ export function CargoPayment({ order: o }: { order: Order }) {
       {!recipient && o.payment.status === "failed" && (
         <CargoCard>
           <Text style={cs.heading}>Choose a retry method</Text>
-          {paymentMethods.map((m) => (
-            <Pressable
-              key={m}
-              accessibilityRole="radio"
-              accessibilityLabel={methodLabels[m]}
-              accessibilityState={{ checked: method === m }}
-              onPress={() => setMethod(m)}
-              style={[cs.row, { paddingVertical: 12 }]}
-            >
-              <Icon
-                name={method === m ? "radio-button-on" : "radio-button-off"}
-                color={T.green}
-              />
-              <Text style={cs.body}>{methodLabels[m]}</Text>
-            </Pressable>
-          ))}
+          {!availablePaymentMethods(data).includes(method) && (
+            <Text style={cs.muted}>
+              {availablePaymentMethods(data).length
+                ? "Your previous method is unavailable. Choose an available method below."
+                : "Payment methods are temporarily unavailable. Please try again later."}
+            </Text>
+          )}
+          {availablePaymentMethods(data)
+            .filter((m) => !recipient || m !== "wallet")
+            .map((m) => (
+              <Pressable
+                key={m}
+                accessibilityRole="radio"
+                accessibilityLabel={methodLabels[m]}
+                accessibilityState={{ checked: method === m }}
+                onPress={() => setMethod(m)}
+                style={[cs.row, { paddingVertical: 12 }]}
+              >
+                <Icon
+                  name={method === m ? "radio-button-on" : "radio-button-off"}
+                  color={T.green}
+                />
+                <Text style={cs.body}>{methodLabels[m]}</Text>
+              </Pressable>
+            ))}
           {method === "external_wallet" && (
             <Field
               label="External wallet provider"
@@ -261,11 +285,37 @@ export function CargoPayment({ order: o }: { order: Order }) {
               onChangeText={setProvider}
             />
           )}
-          <CargoButton
-            title="Open wallet and add funds"
-            secondary
-            onPress={() => nav.navigate("Main", { screen: "Home" })}
-          />
+          {method === "wallet" && (
+            <>
+              <Text style={cs.muted}>
+                Add funds to your LoadMaster wallet, then retry this trip
+                payment.
+              </Text>
+              <CargoButton
+                title="Open wallet and add funds"
+                secondary
+                onPress={() => setWalletOpen(true)}
+              />
+            </>
+          )}
+        </CargoCard>
+      )}
+      {o.financial.events.some((event) => event.kind === "refund") && (
+        <CargoCard>
+          <Text style={cs.heading}>Refund history</Text>
+          {o.financial.events
+            .filter((event) => event.kind === "refund")
+            .map((event) => (
+              <View key={event.id} style={{ gap: 4, marginTop: 12 }}>
+                <Text style={cs.body}>
+                  {money(event.amount)} · {methodLabels[o.method]}
+                </Text>
+                <Text selectable style={cs.muted}>
+                  {event.id} · {new Date(event.createdAt).toLocaleString()}
+                </Text>
+                <Text style={cs.body}>{event.reason}</Text>
+              </View>
+            ))}
         </CargoCard>
       )}
       {o.payment.attempts.length > 0 && (

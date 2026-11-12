@@ -95,6 +95,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Switch } from "@/components/ui/switch";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import {
   DropdownMenu,
@@ -115,6 +116,7 @@ import {
   PageTitle,
   Status,
   type FormSpec,
+  HelpTip,
 } from "@/components/shared";
 interface ContextValue {
   data: AdminData;
@@ -297,9 +299,9 @@ export default function App() {
     await refresh();
     setToast(
       body.outcome === "failed"
-        ? "Demo operation failed. No funds moved."
+        ? "Demo operation failed. Review its result before retrying."
         : body.outcome === "pending"
-          ? "Operation pending confirmation. No funds moved yet."
+          ? "Awaiting confirmation. Check the existing operation before retrying."
           : "Changes saved to the connected demo.",
     );
     return result;
@@ -1589,18 +1591,13 @@ function TripPage({ id }: { id: string }) {
                     )}
                   {["delivered", "returned"].includes(o.stage) &&
                     o.financial.payoutStatus === "scheduled" && (
-                      <Button
-                        variant="outline"
-                        onClick={() =>
-                          adjust(
-                            o.payment.status === "paid"
-                              ? "payout"
-                              : "guarantee",
-                          )
-                        }
-                      >
-                        <Wallet />
-                        Pay driver
+                      <Button variant="outline" asChild>
+                        <NavLink
+                          to={"/operations/payouts?driver=" + o.driverId}
+                        >
+                          <Wallet />
+                          Manage driver withdrawals
+                        </NavLink>
                       </Button>
                     )}
                 </div>
@@ -1616,6 +1613,12 @@ function TripPage({ id }: { id: string }) {
                           <Status value={op.status} />
                         </div>
                         <p className="muted mt-2">{op.reason}</p>
+                        <p className="muted mt-2 select-all">
+                          Reference {op.id} ·{" "}
+                          {op.kind === "refund"
+                            ? methodName(o.method)
+                            : "Driver settlement"}
+                        </p>
                         {op.status === "failed" && (
                           <>
                             <p className="muted mt-2">
@@ -3905,8 +3908,18 @@ function PaymentsPage() {
 }
 function PayoutsPage() {
   const { data, form, mutate, openOrder } = useAdmin();
-  const earned = data.orders.filter((o) =>
-    ["delivered", "returned"].includes(o.stage),
+  const [params] = useSearchParams();
+  const driver = params.get("driver");
+  const withdrawal = params.get("withdrawal");
+  const withdrawals = data.withdrawals.filter(
+    (w) =>
+      (!driver || w.driverId === driver) &&
+      (!withdrawal || w.id === withdrawal),
+  );
+  const earned = data.orders.filter(
+    (o) =>
+      ["delivered", "returned"].includes(o.stage) &&
+      (!driver || o.driverId === driver),
   );
   return (
     <>
@@ -3914,11 +3927,42 @@ function PayoutsPage() {
         title="Driver payouts"
         description="Office approval followed by finance disbursement. Provider payments are simulated."
       />
+      {(driver || withdrawal) && (
+        <Button variant="outline" asChild>
+          <NavLink to="/operations/payouts">Show all withdrawals</NavLink>
+        </Button>
+      )}
+      <details className="notice mb-4">
+        <summary>How to review and pay a withdrawal</summary>
+        <ol className="list-decimal pl-5 mt-3 space-y-2">
+          <li>
+            Verify the driver's amount and destination, then approve or reject
+            the request.
+          </li>
+          <li>
+            Finance records the provider result and transfer reference. Approval
+            leaves the money awaiting payment.
+          </li>
+          <li>
+            For a pending result, check the same transfer before attempting
+            another payment. A confirmed failure can be retried or rejected.
+          </li>
+          <li>
+            Record the charge and payer. For example, a UGX 10,000 withdrawal
+            with a UGX 500 driver-paid charge delivers UGX 9,500. When
+            LoadMaster covers the charge, the driver receives UGX 10,000.
+          </li>
+          <li>
+            Use a payouts reconciliation report to compare net transfers and
+            charges with provider records.
+          </li>
+        </ol>
+      </details>
       <div className="metric-grid">
         <Metric
           label="CONFIRMED PAYOUT CHARGES"
           value={money(
-            data.withdrawals
+            withdrawals
               .filter((w) => w.status === "paid")
               .reduce((n, w) => n + (w.fee || 0), 0),
           )}
@@ -3928,7 +3972,7 @@ function PayoutsPage() {
         <Metric
           label="RECORDED NET PAYOUTS"
           value={money(
-            data.withdrawals
+            withdrawals
               .filter((w) => w.status === "paid" && w.netAmount != null)
               .reduce((n, w) => n + (w.netAmount ?? 0), 0),
           )}
@@ -3938,7 +3982,7 @@ function PayoutsPage() {
       </div>
       <DataTable
         title="Payout requests"
-        rows={[...data.withdrawals].reverse()}
+        rows={[...withdrawals].reverse()}
         columns={[
           { key: "id", label: "Request" },
           {
@@ -4052,6 +4096,7 @@ function PayoutsPage() {
                         {
                           name: "fee",
                           label: "Provider payout charge (UGX)",
+                          help: "Enter the actual provider charge. The example amounts in the guide are illustrative. Pending transfer charges stay locked until their outcome is resolved.",
                           type: "number",
                           min: 0,
                           step: "1",
@@ -4060,6 +4105,7 @@ function PayoutsPage() {
                         {
                           name: "feePayer",
                           label: "Charge paid by",
+                          help: "Driver-paid charges reduce the amount received from the requested earnings. LoadMaster-paid charges use the platform reserve.",
                           type: "select",
                           value:
                             r.feePayer ||
@@ -4078,10 +4124,30 @@ function PayoutsPage() {
                         {
                           name: "reference",
                           label: "Finance / provider reference",
+                          help: "Use the provider's unique transfer reference. Retain it while checking a pending result so reconciliation can find the same transfer.",
                           required: false,
                         },
                         reasonField,
                       ],
+                      preview: (v) => (
+                        <div className="notice">
+                          Wallet withdrawal {money(r.amount)} · Provider charge{" "}
+                          {money(Number(v.fee))} · Driver receives{" "}
+                          {money(
+                            r.amount -
+                              (v.feePayer === "driver"
+                                ? Number(v.fee || 0)
+                                : 0),
+                          )}{" "}
+                          · Total funding{" "}
+                          {money(
+                            r.amount +
+                              (v.feePayer === "platform"
+                                ? Number(v.fee || 0)
+                                : 0),
+                          )}
+                        </div>
+                      ),
                       onSubmit: async (v, key) => {
                         await mutate("/admin/withdrawal", {
                           ...v,
@@ -4113,7 +4179,7 @@ function PayoutsPage() {
       />
       <DataTable
         title="Payout attempts"
-        rows={data.withdrawals.flatMap((w) =>
+        rows={withdrawals.flatMap((w) =>
           (w.attempts || []).map((a: Row) => ({
             ...a,
             withdrawalId: w.id,
@@ -4211,13 +4277,15 @@ function PayoutsPage() {
 function TransfersPage() {
   const { data, form, mutate } = useAdmin();
   const accounts = Object.entries(data.accounts);
-  const options = accounts.map(([value]) => ({
-    value,
-    label:
-      personName(data, value) === "Not assigned"
-        ? title(value)
-        : personName(data, value),
-  }));
+  const options = accounts
+    .filter(([account]) => !account.startsWith("withdrawalClearing:"))
+    .map(([value]) => ({
+      value,
+      label:
+        personName(data, value) === "Not assigned"
+          ? title(value)
+          : personName(data, value),
+    }));
   return (
     <>
       <PageTitle
@@ -4368,49 +4436,135 @@ function TransfersPage() {
   );
 }
 function ReconciliationPage() {
-  const { data, form, mutate } = useAdmin();
+  const { data, form, mutate, openOrder } = useAdmin();
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const latest =
     data.reconciliations.find((r) => r.id === selectedId) ||
     data.reconciliations.at(-1);
+  const explanations: Record<string, string> = {
+    matched: "The provider amount and application record agree.",
+    missing:
+      "A confirmed application payment is absent from this report's provider and date scope. Check the report period and provider settlement timing.",
+    duplicate:
+      "This provider reference appears more than once in the same report. Check the provider file before recording any extra payment.",
+    unexpected:
+      "No application record in this report's scope has this reference. Check the provider, dates and transfer reference.",
+    amount_mismatch:
+      "The provider amount differs from the expected amount. For payouts, compare the net amount received by the driver.",
+    fee_unrecorded:
+      "The provider reports a charge without a corresponding application charge record. Review the source transaction and record any required finance adjustment before comparing again.",
+    fee_missing:
+      "This payout has a recorded charge. Include that provider charge in the third CSV column.",
+    fee_mismatch:
+      "The provider charge differs from the recorded payout charge. Review the finance transfer before resolving the discrepancy.",
+    confirmation_pending:
+      "The provider reports the expected amount and charge while the application awaits confirmation. Verify the report, then confirm the existing payment.",
+    status_mismatch:
+      "The provider reports a payment whose application attempt failed or still awaits approval. Investigate the original attempt and any later retry before making an adjustment.",
+  };
   return (
     <>
       <PageTitle
         title="Reconciliation"
-        description="Match provider settlement reports to payments."
+        description="Compare provider reports with collections, driver payouts, charges and refunds."
         action={
           <AddButton
             onClick={() =>
               form({
                 title: "Import demo settlement report",
                 description:
-                  "Paste CSV rows using reference,amount. Use payment references shown in Collections. No external provider is contacted.",
+                  "Choose the report scope, then paste reference,amount,fee CSV rows. Collection amounts are gross. Payout amounts are the net received by the driver. Include payout charges in the fee column. Dates use UTC.",
                 fields: [
-                  { name: "csv", label: "reference,amount", type: "textarea" },
+                  {
+                    name: "kind",
+                    label: "Report type",
+                    type: "select",
+                    value: "collections",
+                    options: [
+                      {
+                        value: "collections",
+                        label: "Incoming collections and wallet funding",
+                      },
+                      { value: "payouts", label: "Outgoing driver payouts" },
+                      { value: "refunds", label: "Outgoing refunds" },
+                    ],
+                    help: "Import incoming and outgoing provider reports separately so references and totals match the correct records.",
+                  },
+                  {
+                    name: "method",
+                    label: "Provider",
+                    type: "select",
+                    value: "all",
+                    options: [
+                      "all",
+                      "mtn",
+                      "airtel",
+                      "card",
+                      "flexipay",
+                      "external_wallet",
+                    ].map((value) => ({
+                      value,
+                      label:
+                        value === "all" ? "All providers" : methodName(value),
+                    })),
+                  },
+                  {
+                    name: "from",
+                    label: "Report start date (UTC)",
+                    type: "date",
+                    required: false,
+                  },
+                  {
+                    name: "to",
+                    label: "Report end date (UTC)",
+                    type: "date",
+                    required: false,
+                  },
+                  {
+                    name: "csv",
+                    label: "reference,amount,fee",
+                    type: "textarea",
+                    help: "Use collection references from Collections and transfer references from Driver payouts. Amounts and fees are whole UGX. Include one header row if needed.",
+                  },
                 ],
                 submit: "Compare records",
-                onSubmit: async (v) => {
+                onSubmit: async (v, key) => {
                   const lines = String(v.csv)
                     .trim()
                     .split(/\r?\n/)
                     .filter(Boolean);
-                  if (lines[0]?.toLowerCase().includes("reference"))
+                  if (
+                    lines[0]
+                      ?.split(",")[0]
+                      .trim()
+                      .replace(/^"|"$/g, "")
+                      .toLowerCase() === "reference"
+                  )
                     lines.shift();
-                  const rows = lines.map((l) => {
-                    const [reference, amount] = l
+                  const rows = lines.map((line) => {
+                    const cells = line
                       .split(",")
-                      .map((c) => c.trim().replace(/^"|"$/g, ""));
+                      .map((cell) => cell.trim().replace(/^"|"$/g, ""));
+                    const [reference, amount, fee] = cells;
                     if (
+                      cells.length < 2 ||
+                      cells.length > 3 ||
                       !reference ||
                       !Number.isSafeInteger(Number(amount)) ||
-                      Number(amount) <= 0
+                      Number(amount) <= 0 ||
+                      (fee &&
+                        (!Number.isSafeInteger(Number(fee)) || Number(fee) < 0))
                     )
                       throw new Error(
-                        "Use reference,positive whole amount for every row.",
+                        "Each row needs a reference, a positive whole amount and an optional non-negative whole fee.",
                       );
-                    return { reference, amount: Number(amount) };
+                    return {
+                      reference,
+                      amount: Number(amount),
+                      ...(fee ? { fee: Number(fee) } : {}),
+                    };
                   });
-                  await mutate("/admin/reconcile", { rows });
+                  await mutate("/admin/reconcile", { ...v, rows, key });
                   setSelectedId(null);
                 },
               })
@@ -4420,66 +4574,176 @@ function ReconciliationPage() {
           </AddButton>
         }
       />
-      <div className="notice">
-        Provider reports cover external payment attempts. Cash and LoadMaster
-        wallet collections are recorded in the ledger. Missing, duplicate,
-        unexpected, amount mismatches and provider confirmations awaiting
-        application confirmation remain visible for review.
-      </div>
+      <details className="notice mb-4">
+        <summary>How reconciliation works</summary>
+        <ol className="list-decimal pl-5 mt-3 space-y-2">
+          <li>
+            Choose collections, payouts or refunds and the provider and dates
+            covered by the provider file. Cash and LoadMaster wallet payments
+            are tracked in the ledger.
+          </li>
+          <li>
+            Compare the provider reference and amount. For payouts, also compare
+            the charge and net amount received.
+          </li>
+          <li>
+            Open the linked trip or withdrawal to inspect its attempts. Resolve
+            an awaiting confirmation only after verifying the provider evidence.
+          </li>
+          <li>
+            Import again after a correction to compare the current records.
+            Earlier imports retain their original comparison and any resolution
+            notes.
+          </li>
+        </ol>
+      </details>
       {latest ? (
-        <DataTable
-          title={"Reconciliation · " + latest.id}
-          rows={latest.rows.map((r: Row, i: number) => ({
-            ...r,
-            id: r.reference + "-" + i,
-          }))}
-          columns={[
-            { key: "reference", label: "Provider reference" },
-            {
-              key: "kind",
-              label: "Record type",
-              render: (r) => title(r.kind || "trip_payment"),
-            },
-            { key: "account", label: "Wallet account" },
-            { key: "orderId", label: "Trip" },
-            {
-              key: "method",
-              label: "Method",
-              render: (r) => (r.method ? methodName(r.method) : "—"),
-            },
-            {
-              key: "collectionStatus",
-              label: "Application status",
-              render: (r) =>
-                r.collectionStatus ? (
-                  <Status value={r.collectionStatus} />
-                ) : (
-                  "—"
+        <>
+          <p className="muted mb-3">
+            {title(latest.kind || "collections")} ·{" "}
+            {latest.method && latest.method !== "all"
+              ? methodName(latest.method)
+              : "All providers"}{" "}
+            · {latest.from || "All dates"}
+            {latest.to ? " to " + latest.to : ""} ·{" "}
+            {new Date(latest.createdAt).toLocaleString()}
+          </p>
+          <DataTable
+            title={"Reconciliation · " + latest.id}
+            rows={latest.rows.map((r: Row, i: number) => ({
+              ...r,
+              id: r.reference + "-" + i,
+              rowIndex: i,
+            }))}
+            columns={[
+              { key: "reference", label: "Provider reference" },
+              {
+                key: "kind",
+                label: "Record type",
+                render: (r) => title(r.kind || "trip_payment"),
+              },
+              {
+                key: "source",
+                label: "Source record",
+                render: (r) =>
+                  r.withdrawalId ? (
+                    <NavLink
+                      className="text-primary underline"
+                      to={"/operations/payouts?withdrawal=" + r.withdrawalId}
+                    >
+                      {r.withdrawalId}
+                    </NavLink>
+                  ) : r.orderId ? (
+                    <Button variant="link" onClick={() => openOrder(r.orderId)}>
+                      {r.orderId}
+                    </Button>
+                  ) : r.account ? (
+                    <PersonLink id={r.account} />
+                  ) : (
+                    "—"
+                  ),
+              },
+              {
+                key: "method",
+                label: "Method",
+                render: (r) => (r.method ? methodName(r.method) : "—"),
+              },
+              {
+                key: "collectionStatus",
+                label: "Application status",
+                render: (r) =>
+                  r.collectionStatus ? (
+                    <Status value={r.collectionStatus} />
+                  ) : (
+                    "—"
+                  ),
+              },
+              {
+                key: "expectedAmount",
+                label: "Expected amount",
+                render: (r) =>
+                  r.expectedAmount == null ? "—" : money(r.expectedAmount),
+              },
+              {
+                key: "amount",
+                label: "Provider amount",
+                render: (r) =>
+                  r.status === "missing" || r.amount == null
+                    ? "—"
+                    : money(Number(r.amount)),
+              },
+              {
+                key: "expectedFee",
+                label: "Recorded charge",
+                render: (r) =>
+                  r.expectedFee == null ? "—" : money(r.expectedFee),
+              },
+              {
+                key: "fee",
+                label: "Provider charge",
+                render: (r) =>
+                  r.status === "missing" || r.fee == null ? "—" : money(r.fee),
+              },
+              {
+                key: "status",
+                label: "Match result",
+                render: (r) => (
+                  <span className="inline-flex items-center">
+                    <Status value={r.status} />
+                    <HelpTip label={title(r.status) + " explanation"}>
+                      {explanations[r.status] ||
+                        "Review the linked record and provider report."}
+                    </HelpTip>
+                  </span>
                 ),
-            },
-            {
-              key: "expectedAmount",
-              label: "Expected amount",
-              render: (r) =>
-                r.expectedAmount == null ? "—" : money(r.expectedAmount),
-            },
-            {
-              key: "amount",
-              label: "Amount",
-              render: (r) => money(Number(r.amount)),
-            },
-            {
-              key: "status",
-              label: "Match result",
-              render: (r) => <Status value={r.status} />,
-            },
-          ]}
-          exportName="reconciliation"
-        />
+              },
+              {
+                key: "action",
+                label: "Resolution",
+                render: (r) =>
+                  r.resolution ? (
+                    <span title={r.resolution.reason}>
+                      Confirmed {new Date(r.resolution.at).toLocaleString()}
+                    </span>
+                  ) : r.status === "confirmation_pending" ? (
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() =>
+                        form({
+                          title: "Confirm provider evidence",
+                          description: `${r.reference} · ${money(r.amount)}. Verify the provider report before confirming this existing payment. The linked apps receive the same confirmation.`,
+                          fields: [reasonField],
+                          submit: "Confirm existing payment",
+                          onSubmit: async (v) => {
+                            await mutate("/admin/reconcile", {
+                              ...v,
+                              mode: "resolve",
+                              id: latest.id,
+                              row: r.rowIndex,
+                            });
+                          },
+                        })
+                      }
+                    >
+                      Confirm existing payment
+                    </Button>
+                  ) : (
+                    <span className="muted">
+                      {r.status === "matched"
+                        ? "Compared"
+                        : "Review source and provider report"}
+                    </span>
+                  ),
+              },
+            ]}
+            exportName="reconciliation"
+          />
+        </>
       ) : (
         <Empty
           title="Ready for your first comparison"
-          detail="Import a demo provider report after collecting a trip payment."
+          detail="Import a provider report after collecting a payment or initiating a driver payout."
         />
       )}
       <DataTable
@@ -4488,10 +4752,17 @@ function ReconciliationPage() {
           ...r,
           total: r.rows.length,
           matched: r.rows.filter((x: Row) => x.status === "matched").length,
-          exceptions: r.rows.filter((x: Row) => x.status !== "matched").length,
+          exceptions: r.rows.filter(
+            (x: Row) => x.status !== "matched" && !x.resolution,
+          ).length,
         }))}
         columns={[
           { key: "id", label: "Run" },
+          {
+            key: "kind",
+            label: "Type",
+            render: (r) => title(r.kind || "collections"),
+          },
           {
             key: "createdAt",
             label: "Imported",
@@ -4499,7 +4770,7 @@ function ReconciliationPage() {
           },
           { key: "total", label: "Rows" },
           { key: "matched", label: "Matched" },
-          { key: "exceptions", label: "Exceptions" },
+          { key: "exceptions", label: "Unresolved exceptions" },
         ]}
         onSelect={(r) => setSelectedId(r.id)}
       />
@@ -4507,37 +4778,74 @@ function ReconciliationPage() {
   );
 }
 function MethodsPage() {
-  const { data } = useAdmin();
-  const rows = data.people.flatMap((p) =>
-    (p.paymentMethods || []).map((m: Row) => ({
-      ...m,
-      id: p.id + "-" + m.id,
-      owner: p.name,
-      role: p.role,
-    })),
-  );
+  const { data, mutate } = useAdmin();
+  const [saving, setSaving] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const update = async (method: string, enabled: boolean) => {
+    setSaving(method);
+    setError(null);
+    try {
+      await mutate("/admin/payment-method", { method, enabled });
+    } catch (error) {
+      setError((error as Error).message);
+    } finally {
+      setSaving(null);
+    }
+  };
   return (
     <>
       <PageTitle
         title="Payment methods"
-        description="Saved customer and driver methods (masked)."
+        description="Control which payment methods LoadMaster accepts across the customer and driver apps."
       />
+      <div className="notice">
+        Disable a method during an outage to remove it from new payment and
+        withdrawal choices. Pending confirmations, receipts and refunds remain
+        available for reconciliation. Availability updates reach connected apps
+        on their next refresh.
+      </div>
+      <ErrorNotice error={error} />
       <DataTable
-        rows={rows}
+        rows={data.paymentMethods.map((entry) => ({
+          ...entry,
+          id: entry.method,
+        }))}
         columns={[
-          { key: "owner", label: "Account owner" },
-          { key: "role", label: "Role" },
-          { key: "kind", label: "Method", render: (r) => title(r.kind) },
-          { key: "label", label: "Label" },
-          { key: "last4", label: "Account", render: (r) => "•••• " + r.last4 },
           {
-            key: "isDefault",
-            label: "Default",
+            key: "method",
+            label: "Payment method",
+            render: (r) => methodName(r.method),
+          },
+          {
+            key: "enabled",
+            label: "Accepted in apps",
+            render: (r) => (
+              <Switch
+                aria-label={"Accept " + methodName(r.method)}
+                checked={r.enabled}
+                disabled={saving !== null}
+                onCheckedChange={(enabled) => void update(r.method, enabled)}
+              />
+            ),
+          },
+          {
+            key: "updatedAt",
+            label: "Updated",
             render: (r) =>
-              r.isDefault ? <Badge variant="outline">Default</Badge> : "—",
+              r.updatedAt
+                ? new Date(r.updatedAt).toLocaleString()
+                : "Initial configuration",
+          },
+          {
+            key: "updatedBy",
+            label: "Updated by",
+            render: (r) =>
+              data.staff.find((staff) => staff.id === r.updatedBy)?.name ||
+              r.updatedBy ||
+              "Platform",
           },
         ]}
-        exportName="payment-methods"
+        exportName="platform-payment-methods"
       />
     </>
   );

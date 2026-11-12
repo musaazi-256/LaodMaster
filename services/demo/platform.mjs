@@ -1,5 +1,5 @@
 import { randomUUID, scryptSync, timingSafeEqual } from "node:crypto";
-import { Store, DomainError, trucks, places, seed } from "./model.mjs";
+import { Store, DomainError, trucks, places, seed, METHODS } from "./model.mjs";
 const uid = (p) => `${p}-${randomUUID().slice(0, 8).toUpperCase()}`;
 const now = () => new Date().toISOString();
 const check = (ok, code, message, status = 422) => {
@@ -136,6 +136,14 @@ export class PlatformStore extends Store {
     s.settings.offerSeconds ??= s.offerSeconds;
     s.ledger ??= [];
     s.walletTopups ??= [];
+    s.paymentMethods ??= [];
+    for (const method of METHODS)
+      if (!s.paymentMethods.some((entry) => entry.method === method))
+        s.paymentMethods.push({
+          method,
+          enabled: true,
+          reason: "Available on the platform",
+        });
     s.accountNotes ??= [];
     // Saved demo state from before new seed accounts were added gets them too.
     for (const p of seed().profiles)
@@ -632,9 +640,41 @@ export class PlatformStore extends Store {
     for (const [k, v] of Object.entries(this.state.sessions))
       if (v.actor === id) delete this.state.sessions[k];
   }
+  requirePaymentMethod(method) {
+    check(
+      METHODS.includes(method),
+      "METHOD_INVALID",
+      "Choose a supported payment method.",
+    );
+    check(
+      this.state.paymentMethods.some(
+        (entry) => entry.method === method && entry.enabled,
+      ),
+      "METHOD_DISABLED",
+      "This payment method is temporarily unavailable. Choose another available method.",
+    );
+  }
+  withdrawableOrders(actor) {
+    return this.state.orders.filter(
+      (o) =>
+        o.driverId === actor &&
+        ["delivered", "returned"].includes(o.stage) &&
+        o.financial.payoutStatus === "scheduled" &&
+        o.method !== "cash" &&
+        !this.state.operations.some(
+          (op) =>
+            op.orderId === o.id &&
+            op.kind !== "refund" &&
+            op.status === "pending",
+        ),
+    );
+  }
   snapshot(actor) {
     const s = super.snapshot(actor);
     s.profile = safe(s.profile);
+    s.acceptedMethods = this.state.paymentMethods
+      .filter((entry) => entry.enabled)
+      .map((entry) => entry.method);
     const related = new Set(
       s.orders.flatMap((o) => [o.customerId, o.driverId]).filter(Boolean),
     );
@@ -653,6 +693,22 @@ export class PlatformStore extends Store {
     );
     s.tickets = this.state.tickets.filter((t) => t.account === actor);
     s.withdrawals = this.state.withdrawals.filter((w) => w.driverId === actor);
+    if (s.profile.role === "driver") {
+      const unpaid = this.withdrawableOrders(actor).reduce(
+        (n, o) => n + o.financial.earning - (o.financial.disbursed || 0),
+        0,
+      );
+      const reserved = s.withdrawals
+        .filter((w) =>
+          ["requested", "approved", "processing", "failed"].includes(w.status),
+        )
+        .reduce((n, w) => n + w.amount, 0);
+      s.payoutBalance = {
+        unpaid,
+        reserved,
+        available: Math.max(0, unpaid - reserved),
+      };
+    }
     s.adjustmentBalance = this.state.accounts[actor] || 0;
     s.walletTopups = this.state.walletTopups
       .filter((t) => t.account === actor)
@@ -665,6 +721,8 @@ export class PlatformStore extends Store {
   }
   create(actor, b, key) {
     this.active(actor);
+    if (!this.state.keys[actor + ":" + key])
+      this.requirePaymentMethod(b.method);
     const o = super.create(actor, b, key);
     o.financial.rate ??= this.state.feeRate;
     this.notice(actor, "Order placed", o.id + " is " + o.stage, o.id);
@@ -697,6 +755,25 @@ export class PlatformStore extends Store {
         : o.method === "cash"
           ? "Waiting for cash collection and payer confirmation."
           : "Payment request sent. Approve through the selected provider. This demo simulates provider approval.";
+    if (
+      !this.state.paymentMethods.some(
+        (entry) => entry.method === o.method && entry.enabled,
+      )
+    ) {
+      a.status = "failed";
+      a.resolvedAt = now();
+      a.message =
+        "This payment method is temporarily unavailable. Choose another available method to pay for this trip.";
+      o.payment.status = "failed";
+      o.payment.message = a.message;
+      this.notice(
+        o.customerId,
+        "Payment method unavailable",
+        `${o.id}: ${a.message}`,
+        o.id,
+      );
+      return a;
+    }
     o.payment.message = a.message;
     this.notice(
       o.customerId,
@@ -714,6 +791,10 @@ export class PlatformStore extends Store {
     return a;
   }
   payment(actor, id, b) {
+    if (["retry", "approve"].includes(b.action))
+      this.requirePaymentMethod(
+        b.action === "retry" ? b.method : this.order(id, actor).method,
+      );
     const o = super.payment(actor, id, b);
     if (["failed", "unknown"].includes(o.payment.status) && o.driverId)
       this.notice(
@@ -792,6 +873,23 @@ export class PlatformStore extends Store {
       ],
     });
   }
+  creditTopup(t) {
+    if (t.status === "completed") return;
+    this.state.accounts.providerClearing ??= 0;
+    this.state.accounts.providerClearing -= t.amount;
+    this.state.accounts[t.account] += t.amount;
+    t.status = "completed";
+    this.post("wallet.topup", t.amount, "providerClearing", t.account, t.id);
+    this.record(t.account, "wallet.completed", t.id, {
+      amount: t.amount,
+      method: t.method,
+    });
+    this.notice(
+      t.account,
+      "Wallet funds added",
+      `UGX ${t.amount.toLocaleString()} added to your demo wallet.`,
+    );
+  }
   mobile(actor, action, b) {
     const p = this.profile(actor);
     if (action === "wallet") {
@@ -810,25 +908,9 @@ export class PlatformStore extends Store {
       const previous = this.state.walletTopups.find(
         (t) => t.id === b.key && t.account === actor,
       );
-      const credit = (t) => {
-        this.state.accounts.providerClearing ??= 0;
-        this.state.accounts.providerClearing -= t.amount;
-        this.state.accounts[actor] += t.amount;
-        t.status = "completed";
-        this.post("wallet.topup", t.amount, "providerClearing", actor, t.id);
-        this.record(actor, "wallet.completed", t.id, {
-          amount: t.amount,
-          method: t.method,
-        });
-        this.notice(
-          actor,
-          "Wallet funds added",
-          `UGX ${t.amount.toLocaleString()} added to your demo wallet.`,
-        );
-      };
       if (b.resolve) {
         check(previous, "NOT_FOUND", "This top-up could not be found.", 404);
-        if (previous.status === "pending") credit(previous);
+        if (previous.status === "pending") this.creditTopup(previous);
         return safe(previous);
       }
       if (previous) {
@@ -863,6 +945,7 @@ export class PlatformStore extends Store {
         "OUTCOME_INVALID",
         "Choose a demo payment outcome.",
       );
+      this.requirePaymentMethod(b.method);
       const t = {
         id: b.key,
         account: actor,
@@ -872,7 +955,7 @@ export class PlatformStore extends Store {
         createdAt: now(),
       };
       this.state.walletTopups.push(t);
-      if (b.outcome === "success") credit(t);
+      if (b.outcome === "success") this.creditTopup(t);
       else
         this.record(actor, "wallet." + t.status, t.id, {
           amount: t.amount,
@@ -1003,6 +1086,7 @@ export class PlatformStore extends Store {
       return { ...doc, content: undefined };
     }
     if (action === "methods") {
+      if (!b.remove) this.requirePaymentMethod(b.kind);
       check(
         [
           "mtn",
@@ -1126,7 +1210,19 @@ export class PlatformStore extends Store {
         const previous = this.state.withdrawals.find(
           (w) => w.driverId === actor && w.key === b.key,
         );
-        if (previous) return previous;
+        if (previous) {
+          check(
+            (b.amount ?? previous.amount) === previous.amount &&
+              (b.method || previous.method) === previous.method &&
+              (b.destination ?? previous.destination) ===
+                previous.destination &&
+              String(b.provider || previous.provider).trim() ===
+                previous.provider,
+            "KEY_REUSED",
+            "Use a new withdrawal reference when changing the amount or destination.",
+          );
+          return previous;
+        }
       }
       check(
         !this.state.withdrawals.some(
@@ -1139,19 +1235,7 @@ export class PlatformStore extends Store {
         "REQUEST_EXISTS",
         "Your existing withdrawal is still being processed.",
       );
-      const orders = this.state.orders.filter(
-        (o) =>
-          o.driverId === actor &&
-          ["delivered", "returned"].includes(o.stage) &&
-          o.financial.payoutStatus === "scheduled" &&
-          o.method !== "cash" &&
-          !this.state.operations.some(
-            (op) =>
-              op.orderId === o.id &&
-              op.kind !== "refund" &&
-              op.status === "pending",
-          ),
-      );
+      const orders = this.withdrawableOrders(actor);
       const available = orders.reduce(
         (n, o) => n + o.financial.earning - (o.financial.disbursed || 0),
         0,
@@ -1173,7 +1257,8 @@ export class PlatformStore extends Store {
         "METHOD_INVALID",
         "Choose a supported payout platform.",
       );
-      const destination = String(b.destination || p.phone || "").trim();
+      this.requirePaymentMethod(method);
+      const destination = String(b.destination ?? p.phone ?? "").trim();
       check(
         method === "external_wallet"
           ? destination.length >= 5 && destination.length <= 100
@@ -1305,6 +1390,9 @@ export class PlatformStore extends Store {
       transfers: allow.includes("finance") ? this.state.transfers : [],
       accounts: allow.includes("finance") ? this.state.accounts : {},
       withdrawals: allow.includes("finance") ? this.state.withdrawals : [],
+      paymentMethods: allow.includes("finance")
+        ? this.state.paymentMethods
+        : [],
       operations: allow.includes("finance") ? this.state.operations : [],
       ledger: allow.includes("finance") ? this.state.ledger : [],
       reconciliations: allow.includes("finance")
@@ -1339,6 +1427,7 @@ export class PlatformStore extends Store {
       support: "support",
       transfer: "finance",
       reconcile: "finance",
+      "payment-method": "finance",
       withdrawal: "finance",
       settings: "settings",
       reward: "rewards",
@@ -1762,6 +1851,53 @@ export class PlatformStore extends Store {
       });
       return item;
     }
+    if (action === "payment-method") {
+      const entry = this.state.paymentMethods.find(
+        (entry) => entry.method === b.method,
+      );
+      check(
+        entry && typeof b.enabled === "boolean",
+        "METHOD_INVALID",
+        "Choose a supported method and its availability.",
+      );
+      const updateReason =
+        reason ||
+        (b.enabled ? "Enabled by administrator" : "Disabled by administrator");
+      const before = { ...entry };
+      Object.assign(entry, {
+        enabled: b.enabled,
+        reason: updateReason,
+        updatedAt: now(),
+        updatedBy: staff.id,
+      });
+      if (!b.enabled && b.method !== "cash") {
+        for (const o of this.state.orders.filter(
+          (o) =>
+            o.method === b.method && o.payment.status === "awaiting_approval",
+        )) {
+          const attempt = o.payment.attempts.at(-1);
+          const status = b.method === "wallet" ? "failed" : "unknown";
+          if (attempt)
+            Object.assign(attempt, {
+              status,
+              ...(status === "failed" ? { resolvedAt: now() } : {}),
+              message:
+                status === "unknown"
+                  ? "This method is unavailable. Check the existing payment request before choosing another method."
+                  : "This payment method is temporarily unavailable. Choose another available method.",
+            });
+          o.payment.status = status;
+          o.payment.message =
+            attempt?.message || "Check the existing payment request.";
+        }
+      }
+      this.record(staff.id, "payment_method.updated", b.method, {
+        before,
+        after: { ...entry },
+        reason: updateReason,
+      });
+      return entry;
+    }
     if (action === "settings") {
       check(
         Number.isFinite(b.feeRate) &&
@@ -1988,9 +2124,12 @@ export class PlatformStore extends Store {
       if (b.mode === "resolve") {
         const t = this.state.transfers.find((t) => t.id === b.id);
         check(
-          t && t.status === "pending",
+          t &&
+            t.status === "pending" &&
+            !String(t.source).startsWith("withdrawalClearing:") &&
+            !String(t.destination).startsWith("withdrawalClearing:"),
           "OPERATION_UNAVAILABLE",
-          "This transfer is not pending.",
+          "This transfer is not available for manual settlement.",
         );
         check(
           this.state.accounts[t.source] >= t.amount,
@@ -2015,6 +2154,8 @@ export class PlatformStore extends Store {
       );
       check(
         b.source !== b.destination &&
+          !String(b.source).startsWith("withdrawalClearing:") &&
+          !String(b.destination).startsWith("withdrawalClearing:") &&
           b.source in this.state.accounts &&
           b.destination in this.state.accounts,
         "ACCOUNT_INVALID",
@@ -2061,6 +2202,139 @@ export class PlatformStore extends Store {
       return t;
     }
     if (action === "reconcile") {
+      if (b.mode === "resolve") {
+        const run = this.state.reconciliations.find((r) => r.id === b.id);
+        const row = run?.rows[b.row];
+        check(
+          row && row.status === "confirmation_pending",
+          "RECONCILIATION_UNAVAILABLE",
+          "Choose a pending confirmation from a reconciliation report.",
+        );
+        check(
+          reason.length >= 5,
+          "REASON_REQUIRED",
+          "Record the provider evidence used to confirm this payment.",
+        );
+        if (row.resolution) return run;
+        if (row.kind === "payout") {
+          const w = this.state.withdrawals.find(
+            (w) => w.id === row.withdrawalId,
+          );
+          check(
+            w &&
+              (w.status === "processing" ||
+                (w.status === "paid" && w.reference === row.reference)),
+            "PAYMENT_CHANGED",
+            "This payout has changed. Import a fresh report before resolving it.",
+          );
+          if (w.status === "processing")
+            this.adminAction(actor, "withdrawal", {
+              id: w.id,
+              status: "resolve",
+              outcome: "success",
+              reference: row.reference,
+              fee: w.fee ?? 0,
+              feePayer: w.feePayer || "driver",
+              reason,
+            });
+        } else if (row.kind === "refund") {
+          const op = this.state.operations.find(
+            (op) => op.id === row.reference && op.kind === "refund",
+          );
+          check(
+            op &&
+              ["pending", "completed"].includes(op.status) &&
+              op.amount === row.amount,
+            "PAYMENT_CHANGED",
+            "This refund has changed. Import a fresh provider report.",
+          );
+          if (op.status === "pending")
+            this.admin(
+              op.orderId,
+              { action: "resolve-operation", operationId: op.id },
+              actor,
+            );
+        } else if (row.kind === "wallet_topup") {
+          const t = this.state.walletTopups.find((t) => t.id === row.reference);
+          check(
+            t &&
+              ["pending", "completed"].includes(t.status) &&
+              t.amount === row.amount,
+            "PAYMENT_CHANGED",
+            "This wallet funding record has changed. Import a fresh report.",
+          );
+          if (t.status === "pending") this.creditTopup(t);
+        } else {
+          const o = this.order(row.orderId, "admin");
+          const a = o.payment.attempts.find((a) => a.id === row.reference);
+          check(
+            a &&
+              (a.amount ?? o.quote.total) === row.amount &&
+              (o.payment.reference === a.id ||
+                (o.payment.attempts.at(-1) === a &&
+                  ["unknown", "processing"].includes(o.payment.status))),
+            "PAYMENT_CHANGED",
+            "This payment attempt has changed. Import a fresh report before resolving it.",
+          );
+          if (o.payment.status !== "paid") this.paid(o, a);
+        }
+        row.resolution = { actor: staff.id, at: now(), reason };
+        this.record(staff.id, "reconciliation.resolved", run.id, {
+          reference: row.reference,
+          reason,
+        });
+        return run;
+      }
+      const kind = b.kind || "collections";
+      check(
+        ["collections", "payouts", "refunds"].includes(kind),
+        "IMPORT_INVALID",
+        "Choose a collections, payouts or refunds report.",
+      );
+      const method = b.method || "all";
+      check(
+        [
+          "all",
+          "mtn",
+          "airtel",
+          "card",
+          "flexipay",
+          "external_wallet",
+        ].includes(method),
+        "IMPORT_INVALID",
+        "Choose an external provider.",
+      );
+      for (const date of [b.from, b.to])
+        check(
+          !date ||
+            (/^\d{4}-\d{2}-\d{2}$/.test(date) &&
+              !Number.isNaN(Date.parse(date)) &&
+              new Date(date).toISOString().slice(0, 10) === date),
+          "IMPORT_INVALID",
+          "Use valid YYYY-MM-DD report dates.",
+        );
+      check(
+        !b.from || !b.to || b.from <= b.to,
+        "IMPORT_INVALID",
+        "The report start date must precede its end date.",
+      );
+      const fingerprint = JSON.stringify({
+        kind,
+        method,
+        from: b.from || "",
+        to: b.to || "",
+        rows: b.rows,
+      });
+      const previous =
+        b.key && this.state.reconciliations.find((r) => r.key === b.key);
+      if (previous) {
+        check(
+          previous.fingerprint === fingerprint,
+          "KEY_REUSED",
+          "This import reference is already associated with another report.",
+        );
+        return previous;
+      }
       check(
         Array.isArray(b.rows) && b.rows.length <= 500,
         "IMPORT_INVALID",
@@ -2073,7 +2347,9 @@ export class PlatformStore extends Store {
             typeof row.reference === "string" &&
             row.reference.trim() &&
             Number.isSafeInteger(row.amount) &&
-            row.amount > 0,
+            row.amount > 0 &&
+            (row.fee == null ||
+              (Number.isSafeInteger(row.fee) && row.fee >= 0)),
         ),
         "IMPORT_INVALID",
         "Every settlement row needs a reference and positive whole amount.",
@@ -2086,6 +2362,8 @@ export class PlatformStore extends Store {
             reference: a.id,
             method: a.method,
             collectionStatus: a.status,
+            createdAt: a.resolvedAt || a.createdAt,
+            kind: "trip_payment",
             amount: a.amount ?? o.quote.total,
           })),
       );
@@ -2102,17 +2380,82 @@ export class PlatformStore extends Store {
                 : "failed",
           amount: t.amount,
           kind: "wallet_topup",
+          createdAt: t.createdAt,
         });
+      if (kind === "payouts") {
+        attempts.length = 0;
+        for (const w of this.state.withdrawals) {
+          const outgoing = w.attempts?.length
+            ? w.attempts
+            : w.status === "paid"
+              ? [
+                  {
+                    id: w.id,
+                    reference: w.reference || w.id,
+                    status: "paid",
+                    createdAt: w.paidAt || w.createdAt,
+                    fee: w.fee,
+                    netAmount: w.netAmount,
+                  },
+                ]
+              : [];
+          for (const a of outgoing)
+            attempts.push({
+              withdrawalId: w.id,
+              account: w.driverId,
+              reference: a.reference || a.id,
+              method: w.method || "mtn",
+              collectionStatus: a.status,
+              amount: a.netAmount ?? w.amount,
+              fee: a.fee ?? 0,
+              kind: "payout",
+              createdAt: a.resolvedAt || a.createdAt,
+            });
+        }
+      }
+      if (kind === "refunds") {
+        attempts.length = 0;
+        for (const op of this.state.operations.filter(
+          (op) => op.kind === "refund",
+        )) {
+          const o = this.order(op.orderId, "admin");
+          if (["wallet", "cash"].includes(o.method)) continue;
+          attempts.push({
+            orderId: o.id,
+            reference: op.id,
+            method: o.method,
+            collectionStatus:
+              op.status === "completed"
+                ? "paid"
+                : op.status === "pending"
+                  ? "processing"
+                  : "failed",
+            amount: op.amount,
+            kind: "refund",
+            createdAt: op.resolvedAt || op.createdAt,
+          });
+        }
+      }
+      const scoped = attempts.filter(
+        (p) =>
+          (method === "all" || p.method === method) &&
+          (!b.from ||
+            ["unknown", "processing"].includes(p.collectionStatus) ||
+            p.createdAt?.slice(0, 10) >= b.from) &&
+          (!b.to || p.createdAt?.slice(0, 10) <= b.to),
+      );
       const seen = new Set();
       const rows = b.rows.map((row) => {
         const reference = row.reference.trim();
-        const p = attempts.find((p) => p.reference === reference);
+        const p = scoped.find((p) => p.reference === reference);
         const duplicate = seen.has(reference);
         seen.add(reference);
         return {
           ...row,
           reference,
           orderId: p?.orderId,
+          withdrawalId: p?.withdrawalId,
+          expectedFee: p?.fee,
           account: p?.account,
           kind: p?.kind || (p ? "trip_payment" : undefined),
           method: p?.method,
@@ -2124,18 +2467,37 @@ export class PlatformStore extends Store {
               ? "unexpected"
               : row.amount !== p.amount
                 ? "amount_mismatch"
-                : p.collectionStatus === "paid"
-                  ? "matched"
-                  : ["unknown", "processing"].includes(p.collectionStatus)
-                    ? "confirmation_pending"
-                    : "status_mismatch",
+                : kind !== "payouts" && (row.fee || 0) > 0
+                  ? "fee_unrecorded"
+                  : kind === "payouts" && row.fee == null && p.fee > 0
+                    ? "fee_missing"
+                    : kind === "payouts" && row.fee != null && row.fee !== p.fee
+                      ? "fee_mismatch"
+                      : p.collectionStatus === "paid"
+                        ? "matched"
+                        : ["unknown", "processing"].includes(p.collectionStatus)
+                          ? "confirmation_pending"
+                          : "status_mismatch",
         };
       });
-      for (const p of attempts)
+      for (const p of scoped)
         if (p.collectionStatus === "paid" && !seen.has(p.reference))
-          rows.push({ ...p, expectedAmount: p.amount, status: "missing" });
+          rows.push({
+            ...p,
+            expectedAmount: p.amount,
+            expectedFee: p.fee,
+            amount: null,
+            fee: null,
+            status: "missing",
+          });
       const record = {
         id: uid("REC"),
+        key: b.key,
+        fingerprint,
+        kind,
+        method,
+        from: b.from || null,
+        to: b.to || null,
         createdAt: now(),
         actor: staff.id,
         rows,
@@ -2193,6 +2555,7 @@ export class PlatformStore extends Store {
             "A unique payout attempt reference is required.",
           );
           if (w.attempts.some((a) => a.id === b.key)) return w;
+          this.requirePaymentMethod(w.method || "mtn");
         } else {
           check(
             w.status === "processing" && b.outcome !== "pending",
@@ -2210,9 +2573,17 @@ export class PlatformStore extends Store {
           !reference ||
             !this.state.withdrawals.some(
               (other) =>
-                other.id !== w.id &&
-                (other.reference === reference ||
-                  other.attempts?.some((a) => a.reference === reference)),
+                (other.id !== w.id && other.reference === reference) ||
+                other.attempts?.some(
+                  (a) =>
+                    a.reference === reference &&
+                    !(
+                      other.id === w.id &&
+                      (b.status === "resolve"
+                        ? a === w.attempts.at(-1)
+                        : a.id === b.key)
+                    ),
+                ),
             ),
           "REFERENCE_USED",
           "This payment reference belongs to another withdrawal.",
@@ -2534,6 +2905,14 @@ export class PlatformStore extends Store {
       "Enter an amount, reason and operation reference.",
     );
     const previous = this.state.operations.find((op) => op.id === b.key);
+    check(
+      !previous ||
+        (previous.orderId === id &&
+          previous.kind === b.action &&
+          previous.amount === b.amount),
+      "KEY_REUSED",
+      "This operation reference is already associated with different payment details.",
+    );
     if (previous && previous.status !== "pending") return o;
     if (["pending", "failed"].includes(b.outcome)) {
       check(
@@ -2632,8 +3011,10 @@ export class PlatformStore extends Store {
     this.post(b.action, b.amount, source, destination, b.key);
     const entry = this.state.audit.at(-1);
     if (entry?.action === b.action) entry.actor = staff.id;
-    if (previous) previous.status = "completed";
-    else
+    if (previous) {
+      previous.status = "completed";
+      previous.resolvedAt = now();
+    } else
       this.state.operations.push({
         id: b.key,
         orderId: id,
@@ -2642,6 +3023,7 @@ export class PlatformStore extends Store {
         status: "completed",
         reason: b.reason,
         createdAt: now(),
+        resolvedAt: now(),
         actor: staff.id,
       });
     this.notice(

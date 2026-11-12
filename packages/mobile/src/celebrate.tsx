@@ -85,7 +85,7 @@ export function CelebrationHost({ children }: { children: React.ReactNode }) {
     AccessibilityInfo.announceForAccessibility?.(
       c.title + (c.message ? ". " + c.message : ""),
     );
-    // Long enough to read; tapping anywhere closes it sooner.
+    // Long enough to read; Continue or the backdrop closes it sooner.
     timer.current = setTimeout(
       () => setCurrent(null),
       c.milestone ? 5000 : 4000,
@@ -102,14 +102,15 @@ export function CelebrationHost({ children }: { children: React.ReactNode }) {
         statusBarTranslucent
       >
         {current && (
-          <Pressable
-            style={styles.backdrop}
-            onPress={close}
-            accessibilityRole="button"
-            accessibilityLabel="Close confirmation"
-          >
+          <View style={styles.backdrop}>
+            <Pressable
+              style={StyleSheet.absoluteFill}
+              onPress={close}
+              accessibilityRole="button"
+              accessibilityLabel="Close confirmation"
+            />
             <Card c={current} reduceMotion={reduceMotion} onClose={close} />
-          </Pressable>
+          </View>
         )}
       </Modal>
     </Context.Provider>

@@ -16,6 +16,16 @@ export const paymentMethods: Method[] = [
   "flexipay",
   "external_wallet",
 ];
+export interface PlatformPaymentMethod {
+  method: Method;
+  enabled: boolean;
+  reason: string;
+  updatedAt?: string;
+  updatedBy?: string;
+}
+export const availablePaymentMethods = (
+  data: { acceptedMethods?: Method[] } | null | undefined,
+): Method[] => (data ? (data.acceptedMethods ?? paymentMethods) : []);
 export type Stage =
   | "scheduled"
   | "searching"
@@ -242,6 +252,7 @@ export interface Order {
   }[];
 }
 export interface Snapshot {
+  acceptedMethods?: Method[];
   profile: Profile;
   people: Profile[];
   trucks: Truck[];
@@ -270,6 +281,7 @@ export interface Snapshot {
     createdAt: string;
     replies: { id: string; message: string; at: string }[];
   }[];
+  payoutBalance?: { unpaid: number; reserved: number; available: number };
   withdrawals?: {
     id: string;
     amount: number;

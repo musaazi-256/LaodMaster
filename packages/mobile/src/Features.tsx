@@ -12,7 +12,12 @@ import {
 } from "react-native";
 import * as ImagePicker from "expo-image-picker";
 import type { NativeStackScreenProps } from "@react-navigation/native-stack";
-import { methodLabels, money, type Method } from "../../contracts/src";
+import {
+  methodLabels,
+  money,
+  availablePaymentMethods,
+  type Method,
+} from "../../contracts/src";
 import type { RootStack } from "./navigation";
 import { useAction, useDemo } from "./state";
 import { success } from "./successes";
@@ -300,14 +305,22 @@ export function PaymentMethods() {
                 {m.label} ·•••• {m.last4}
               </Body>
             </View>
-            {m.isDefault && <Badge>Default</Badge>}
+            {!availablePaymentMethods(data).includes(m.kind) ? (
+              <Badge tone="amber">Unavailable</Badge>
+            ) : (
+              m.isDefault && <Badge>Default</Badge>
+            )}
           </Row>
           <Row>
             <View style={{ flex: 1 }}>
               <Button
                 secondary
                 title="Set default"
-                disabled={action.busy || m.isDefault}
+                disabled={
+                  action.busy ||
+                  m.isDefault ||
+                  !availablePaymentMethods(data).includes(m.kind)
+                }
                 onPress={() =>
                   void action.run(() =>
                     client.request("/account/methods", {
@@ -362,23 +375,25 @@ export function PaymentMethods() {
       />
       {adding && (
         <Card>
-          {(["mtn", "airtel", "card"] as Method[]).map((m) => (
-            <Pressable
-              accessibilityRole="radio"
-              accessibilityState={{ checked: kind === m }}
-              onPress={() => setKind(m)}
-              key={m}
-              style={{ paddingVertical: 10 }}
-            >
-              <Row>
-                <Icon
-                  name={kind === m ? "radio-button-on" : "radio-button-off"}
-                  color={C.green}
-                />
-                <Body>{methodLabels[m]}</Body>
-              </Row>
-            </Pressable>
-          ))}
+          {availablePaymentMethods(data)
+            .filter((m) => ["mtn", "airtel", "card"].includes(m))
+            .map((m) => (
+              <Pressable
+                accessibilityRole="radio"
+                accessibilityState={{ checked: kind === m }}
+                onPress={() => setKind(m)}
+                key={m}
+                style={{ paddingVertical: 10 }}
+              >
+                <Row>
+                  <Icon
+                    name={kind === m ? "radio-button-on" : "radio-button-off"}
+                    color={C.green}
+                  />
+                  <Body>{methodLabels[m]}</Body>
+                </Row>
+              </Pressable>
+            ))}
           <Field
             label="Method nickname"
             value={label}
@@ -396,6 +411,7 @@ export function PaymentMethods() {
           <Button
             title="Save demo method"
             busy={action.busy}
+            disabled={!availablePaymentMethods(data).includes(kind)}
             onPress={() =>
               void action.run(
                 async () => {
@@ -688,21 +704,13 @@ export function PayoutRequests() {
   const [requestKey, setRequestKey] = useState(
     () => "withdrawal-" + Date.now(),
   );
+  const methods = availablePaymentMethods(data).filter((m) =>
+    ["mtn", "airtel", "flexipay", "external_wallet"].includes(m),
+  );
   const active = data?.withdrawals?.find((w) =>
     ["requested", "approved", "processing", "failed"].includes(w.status),
   );
-  const total =
-    data?.orders
-      .filter(
-        (o) =>
-          ["delivered", "returned"].includes(o.stage) &&
-          o.financial.payoutStatus === "scheduled" &&
-          o.method !== "cash",
-      )
-      .reduce(
-        (n, o) => n + o.financial.earning - (o.financial.disbursed || 0),
-        0,
-      ) || 0;
+  const total = data?.payoutBalance?.unpaid ?? 0;
   return (
     <Screen>
       <Title>Withdraw earnings</Title>
@@ -721,23 +729,33 @@ export function PayoutRequests() {
             {active.status}. Complete this request before submitting another.
           </Body>
         )}
+        <Body muted>
+          Available after reservations ·{" "}
+          {money(data?.payoutBalance?.available || 0)}
+        </Body>
         <Field
+          hint="Enter the amount to remove from your earnings. If you cover a provider charge, it is deducted from this amount."
           label="Withdrawal amount (UGX)"
           value={amount}
           onChangeText={setAmount}
           keyboardType="numeric"
         />
         <Label>PAYOUT PLATFORM</Label>
-        {(["mtn", "airtel", "flexipay", "external_wallet"] as Method[]).map(
-          (m) => (
-            <Button
-              key={m}
-              title={(method === m ? "✓ " : "") + methodLabels[m]}
-              secondary
-              onPress={() => setMethod(m)}
-            />
-          ),
+        {!methods.includes(method) && (
+          <Body muted>
+            {methods.length
+              ? "Choose an available payout platform. Availability is managed by LoadMaster."
+              : "Payout platforms are temporarily unavailable. Please try again later."}
+          </Body>
         )}
+        {methods.map((m) => (
+          <Button
+            key={m}
+            title={(method === m ? "✓ " : "") + methodLabels[m]}
+            secondary
+            onPress={() => setMethod(m)}
+          />
+        ))}
         {method === "external_wallet" && (
           <Field
             label="Platform name"
@@ -746,6 +764,7 @@ export function PayoutRequests() {
           />
         )}
         <Field
+          hint="Check the destination carefully. Office approval is followed by a separate finance payment."
           label={
             method === "external_wallet"
               ? "Destination account"
@@ -759,6 +778,7 @@ export function PayoutRequests() {
           title="Request withdrawal"
           busy={action.busy}
           disabled={
+            !methods.includes(method) ||
             !total ||
             !!active ||
             !Number.isSafeInteger(Number(amount)) ||
@@ -854,6 +874,19 @@ export function PayoutRequests() {
                     : ""}
                 </Body>
               ))}
+              <Body muted>
+                {w.status === "requested"
+                  ? "Office is reviewing your request."
+                  : w.status === "approved"
+                    ? "Approved. Finance still needs to send the payment."
+                    : w.status === "processing"
+                      ? "The transfer result is being checked. Your earnings stay reserved until finance confirms the outcome."
+                      : w.status === "failed"
+                        ? "Finance can retry the confirmed failure or reject the request to release your earnings."
+                        : w.status === "rejected"
+                          ? "The reservation has been released. Correct your details and submit a new request."
+                          : "Payment confirmed. This receipt includes any provider charge."}
+              </Body>
               {!!w.reason && <Body muted>{w.reason}</Body>}
             </Card>
           ))

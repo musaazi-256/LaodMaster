@@ -12,7 +12,12 @@ import {
   View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { money, methodLabels, type Method } from "../../contracts/src";
+import {
+  money,
+  methodLabels,
+  availablePaymentMethods,
+  type Method,
+} from "../../contracts/src";
 import { useAction, useDemo } from "./state";
 import { success } from "./successes";
 import { newKey } from "./api";
@@ -32,6 +37,9 @@ export function WalletSheet({
   const [outcome, setOutcome] = useState("success");
   const [message, setMessage] = useState<string | null>(null);
   const attempt = useRef(newKey());
+  const methods = availablePaymentMethods(data).filter((m) =>
+    ["mtn", "airtel", "card"].includes(m),
+  );
   const pending = data?.walletTopups?.find((t) => t.status === "pending");
   useEffect(() => {
     if (visible) setMessage(null);
@@ -106,7 +114,13 @@ export function WalletSheet({
                   returnKeyType="done"
                 />
                 <Text style={styles.label}>Payment method</Text>
-                {(["mtn", "airtel", "card"] as Method[]).map((m) => (
+                {!methods.includes(method) && (
+                  <Text style={styles.description}>
+                    Choose an available payment method. If none are available,
+                    please try again later.
+                  </Text>
+                )}
+                {methods.map((m) => (
                   <Pressable
                     key={m}
                     accessibilityRole="radio"
@@ -168,7 +182,8 @@ export function WalletSheet({
               disabled={
                 action.busy ||
                 (!pending &&
-                  (!Number.isInteger(Number(amount)) ||
+                  (!methods.includes(method) ||
+                    !Number.isInteger(Number(amount)) ||
                     Number(amount) < 1 ||
                     Number(amount) > 1000000))
               }

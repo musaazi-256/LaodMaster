@@ -5,6 +5,7 @@ import { Pressable, Text, View } from "react-native";
 import type { NativeStackScreenProps } from "@react-navigation/native-stack";
 import {
   methodLabels,
+  availablePaymentMethods,
   money,
   type Method,
   type Scenario,
@@ -115,6 +116,7 @@ export function Payment({
             <Button
               title="Retry payment"
               busy={action.busy}
+              disabled={!availablePaymentMethods(data).includes(method)}
               onPress={() => run({ action: "retry", method })}
             />
           )}
@@ -290,23 +292,25 @@ export function Payment({
       {p.status === "failed" && (
         <Card>
           <Title small>Try again or change method</Title>
-          {(["mtn", "airtel", "card"] as Method[]).map((m) => (
-            <Pressable
-              accessibilityRole="radio"
-              accessibilityState={{ checked: method === m }}
-              key={m}
-              onPress={() => setMethod(m)}
-              style={{ paddingVertical: 10 }}
-            >
-              <Row>
-                <Icon
-                  name={method === m ? "radio-button-on" : "radio-button-off"}
-                  color={C.green}
-                />
-                <Body>{methodLabels[m]}</Body>
-              </Row>
-            </Pressable>
-          ))}
+          {availablePaymentMethods(data)
+            .filter((m) => ["mtn", "airtel", "card"].includes(m))
+            .map((m) => (
+              <Pressable
+                accessibilityRole="radio"
+                accessibilityState={{ checked: method === m }}
+                key={m}
+                onPress={() => setMethod(m)}
+                style={{ paddingVertical: 10 }}
+              >
+                <Row>
+                  <Icon
+                    name={method === m ? "radio-button-on" : "radio-button-off"}
+                    color={C.green}
+                  />
+                  <Body>{methodLabels[m]}</Body>
+                </Row>
+              </Pressable>
+            ))}
         </Card>
       )}
       {paid && (

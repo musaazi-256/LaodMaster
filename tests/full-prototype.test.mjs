@@ -1,5 +1,8 @@
 import test from "node:test";
 import assert from "node:assert/strict";
+import { mkdtempSync, rmSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { PlatformStore } from "../services/demo/platform.mjs";
 const code = (c) => (e) => e.code === c;
 const login = (s, role = "customer", identifier = "alex@example.test") =>
@@ -800,4 +803,331 @@ test("invalid payout charges and unfunded platform charges leave the withdrawal 
   assert.equal(w.status, "approved");
   assert.equal(w.fee, undefined);
   assert.equal(o.financial.disbursed, undefined);
+});
+
+test("collection reconciliation resolves the existing delayed attempt once and preserves comparison history", () => {
+  const s = new PlatformStore();
+  const o = delivered(s);
+  s.payment("customer-1", o.id, { action: "approve", scenario: "delayed" });
+  const rows = [{ reference: o.payment.attempts[0].id, amount: o.quote.total }];
+  const report = s.adminAction("admin", "reconcile", {
+    rows,
+    key: "collection-report-key",
+  });
+  assert.equal(report.rows[0].status, "confirmation_pending");
+  assert.equal(
+    s.adminAction("admin", "reconcile", {
+      rows: rows.map((row) => ({ ...row, fee: 100 })),
+    }).rows[0].status,
+    "fee_unrecorded",
+  );
+  const body = {
+    mode: "resolve",
+    id: report.id,
+    row: 0,
+    reason: "Provider report confirms the debit",
+  };
+  s.adminAction("admin", "reconcile", body);
+  s.adminAction("admin", "reconcile", body);
+  assert.equal(o.payment.status, "paid");
+  assert.equal(o.payment.attempts.length, 1);
+  assert.equal(s.state.ledger.filter((l) => l.kind === "collection").length, 1);
+  assert.equal(report.rows[0].status, "confirmation_pending");
+  assert.equal(report.rows[0].resolution.actor, "staff-1");
+  assert.equal(
+    s.adminAction("admin", "reconcile", { rows }).rows[0].status,
+    "matched",
+  );
+  assert.equal(
+    s.adminAction("admin", "reconcile", { rows, key: "collection-report-key" })
+      .id,
+    report.id,
+  );
+  assert.throws(
+    () =>
+      s.adminAction("admin", "reconcile", {
+        rows: [],
+        key: "collection-report-key",
+      }),
+    code("KEY_REUSED"),
+  );
+});
+
+test("payout reconciliation uses net amount, fee and provider scope and resolves reserved funds once", () => {
+  const s = new PlatformStore();
+  const o = delivered(s);
+  paid(s, o);
+  const w = s.mobile("driver-1", "withdrawal", {
+    amount: 10000,
+    method: "airtel",
+  });
+  const step = (b) =>
+    s.adminAction("admin", "withdrawal", {
+      id: w.id,
+      reason: "Office verified provider evidence",
+      ...b,
+    });
+  step({ status: "approved" });
+  step({
+    status: "pay",
+    outcome: "pending",
+    key: "reconcile-outgoing-attempt",
+    reference: "outgoing-provider-reference",
+    fee: 500,
+    feePayer: "driver",
+  });
+  const row = {
+    reference: "outgoing-provider-reference",
+    amount: 9500,
+    fee: 500,
+  };
+  const reconcile = (rows, extra = {}) =>
+    s.adminAction("admin", "reconcile", { kind: "payouts", rows, ...extra });
+  assert.equal(
+    reconcile([{ ...row, amount: 10000 }]).rows[0].status,
+    "amount_mismatch",
+  );
+  assert.equal(
+    reconcile([{ ...row, fee: 200 }]).rows[0].status,
+    "fee_mismatch",
+  );
+  assert.equal(
+    reconcile([{ reference: row.reference, amount: row.amount }]).rows[0]
+      .status,
+    "fee_missing",
+  );
+  const report = reconcile([row]);
+  assert.equal(report.rows[0].withdrawalId, w.id);
+  assert.equal(report.rows[0].status, "confirmation_pending");
+  const body = {
+    mode: "resolve",
+    id: report.id,
+    row: 0,
+    reason: "Provider transfer and charge confirmed",
+  };
+  s.adminAction("admin", "reconcile", body);
+  s.adminAction("admin", "reconcile", body);
+  assert.equal(w.status, "paid");
+  assert.equal(w.attempts.length, 1);
+  assert.equal(s.state.accounts["withdrawalClearing:" + w.id], 0);
+  assert.equal(s.state.accounts["providerFees:airtel"], 500);
+  assert.equal(reconcile([row]).rows[0].status, "matched");
+  assert.equal(reconcile([]).rows[0].status, "missing");
+  assert.equal(reconcile([]).rows[0].expectedAmount, 9500);
+  assert.equal(reconcile([]).rows[0].expectedFee, 500);
+  assert.equal(reconcile([]).rows[0].amount, null);
+  assert.equal(reconcile([]).rows[0].fee, null);
+  assert.deepEqual(reconcile([], { method: "mtn" }).rows, []);
+  assert.deepEqual(reconcile([], { to: "2000-01-01" }).rows, []);
+  assert.equal(reconcile([row, row]).rows[1].status, "duplicate");
+  assert.throws(
+    () =>
+      s.adminAction("admin", "reconcile", {
+        mode: "resolve",
+        id: reconcile([{ ...row, amount: 12000 }]).id,
+        row: 0,
+        reason: "Do not confirm a discrepancy",
+      }),
+    code("RECONCILIATION_UNAVAILABLE"),
+  );
+});
+
+test("wallet funding reconciliation updates the same topup and wallet once", () => {
+  const s = new PlatformStore();
+  const t = s.mobile("customer-1", "wallet", {
+    key: "pending-topup-report",
+    amount: 20000,
+    method: "mtn",
+    outcome: "pending",
+  });
+  const before = s.state.accounts["customer-1"];
+  const report = s.adminAction("admin", "reconcile", {
+    rows: [{ reference: t.id, amount: t.amount }],
+  });
+  const body = {
+    mode: "resolve",
+    id: report.id,
+    row: 0,
+    reason: "Provider receipt confirmed topup",
+  };
+  s.adminAction("admin", "reconcile", body);
+  s.adminAction("admin", "reconcile", body);
+  assert.equal(s.state.accounts["customer-1"], before + 20000);
+  assert.equal(s.state.walletTopups.length, 1);
+});
+
+test("withdrawal request retries keep their amount and destination and reserved funding cannot be transferred", () => {
+  const s = new PlatformStore();
+  const o = delivered(s);
+  paid(s, o);
+  assert.throws(
+    () => s.mobile("driver-1", "withdrawal", { amount: 1000, destination: "" }),
+    code("DESTINATION_INVALID"),
+  );
+  const body = {
+    amount: 1000,
+    destination: "+256700123456",
+    key: "stable-withdrawal-reference",
+  };
+  const w = s.mobile("driver-1", "withdrawal", body);
+  assert.throws(
+    () => s.mobile("driver-1", "withdrawal", { ...body, amount: 2000 }),
+    code("KEY_REUSED"),
+  );
+  assert.equal(s.mobile("driver-1", "withdrawal", body).id, w.id);
+  assert.equal(s.snapshot("driver-1").payoutBalance.reserved, 1000);
+  assert.equal(
+    s.snapshot("driver-1").payoutBalance.available,
+    o.financial.earning - 1000,
+  );
+  s.adminAction("admin", "withdrawal", {
+    id: w.id,
+    status: "approved",
+    reason: "Destination checked by office",
+  });
+  s.adminAction("admin", "withdrawal", {
+    id: w.id,
+    status: "pay",
+    key: "pending-reserved-funds",
+    reference: "reserved-provider-reference",
+    outcome: "pending",
+    reason: "Awaiting provider confirmation",
+  });
+  assert.throws(
+    () =>
+      s.adminAction("admin", "transfer", {
+        source: "withdrawalClearing:" + w.id,
+        destination: "platform",
+        amount: 100,
+        key: "drain-reserved-funds",
+        reason: "Test reserved account protection",
+      }),
+    code("ACCOUNT_INVALID"),
+  );
+  assert.equal(s.state.accounts["withdrawalClearing:" + w.id], 1000);
+});
+
+test("refund reconciliation resolves the original pending refund without crediting the app wallet", () => {
+  const s = new PlatformStore();
+  const o = delivered(s);
+  paid(s, o);
+  const before = s.state.accounts["customer-1"];
+  s.admin(o.id, {
+    action: "refund",
+    amount: 1000,
+    key: "refund-provider-report",
+    outcome: "pending",
+    reason: "Provider refund awaiting confirmation",
+  });
+  const rows = [{ reference: "refund-provider-report", amount: 1000 }];
+  const report = s.adminAction("admin", "reconcile", { kind: "refunds", rows });
+  assert.equal(report.rows[0].status, "confirmation_pending");
+  const body = {
+    mode: "resolve",
+    id: report.id,
+    row: 0,
+    reason: "Provider confirmed refund settlement",
+  };
+  s.adminAction("admin", "reconcile", body);
+  s.adminAction("admin", "reconcile", body);
+  assert.equal(o.financial.refunded, 1000);
+  assert.equal(s.state.accounts["customer-1"], before);
+  assert.equal(s.state.accounts["customer-1:mtn"], 1000);
+  assert.equal(s.state.ledger.filter((l) => l.kind === "refund").length, 1);
+  assert.equal(
+    s.adminAction("admin", "reconcile", { kind: "refunds", rows }).rows[0]
+      .status,
+    "matched",
+  );
+});
+
+test("finance can reconcile an existing provider topup after the account is suspended", () => {
+  const s = new PlatformStore();
+  const t = s.mobile("customer-1", "wallet", {
+    key: "suspended-customer-topup",
+    amount: 1000,
+    method: "mtn",
+    outcome: "pending",
+  });
+  s.profile("customer-1").status = "suspended";
+  const before = s.state.accounts["customer-1"];
+  const report = s.adminAction("admin", "reconcile", {
+    rows: [{ reference: t.id, amount: t.amount }],
+  });
+  s.adminAction("admin", "reconcile", {
+    mode: "resolve",
+    id: report.id,
+    row: 0,
+    reason: "Provider received funds before suspension",
+  });
+  assert.equal(s.state.accounts["customer-1"], before + 1000);
+  assert.equal(s.profile("customer-1").status, "suspended");
+});
+
+test("daily reconciliation includes unresolved transfers initiated before the report period", () => {
+  const s = new PlatformStore();
+  const o = delivered(s);
+  s.payment("customer-1", o.id, { action: "approve", scenario: "delayed" });
+  o.payment.attempts[0].createdAt = "2020-01-01T00:00:00.000Z";
+  const report = s.adminAction("admin", "reconcile", {
+    rows: [{ reference: o.payment.attempts[0].id, amount: o.quote.total }],
+    from: "2026-11-12",
+  });
+  assert.equal(report.rows[0].status, "confirmation_pending");
+});
+
+test("pending funding and reconciliation confirmation survive restarts without duplicate disbursements", () => {
+  const directory = mkdtempSync(join(tmpdir(), "loadmaster-reconciliation-"));
+  try {
+    const file = join(directory, "state.json");
+    let s = new PlatformStore(file);
+    const o = delivered(s);
+    paid(s, o);
+    const w = s.mobile("driver-1", "withdrawal", { amount: 10000 });
+    s.adminAction("admin", "withdrawal", {
+      id: w.id,
+      status: "approved",
+      reason: "Office verified payout details",
+    });
+    s.adminAction("admin", "withdrawal", {
+      id: w.id,
+      status: "pay",
+      outcome: "pending",
+      key: "persisted-payout-attempt",
+      reference: "persisted-provider-reference",
+      fee: 500,
+      feePayer: "platform",
+      reason: "Provider result pending",
+    });
+    s = new PlatformStore(file);
+    assert.equal(s.state.accounts["withdrawalClearing:" + w.id], 10500);
+    const report = s.adminAction("admin", "reconcile", {
+      kind: "payouts",
+      rows: [
+        { reference: "persisted-provider-reference", amount: 10000, fee: 500 },
+      ],
+    });
+    const body = {
+      mode: "resolve",
+      id: report.id,
+      row: 0,
+      reason: "Verified persisted provider settlement",
+    };
+    s.adminAction("admin", "reconcile", body);
+    s = new PlatformStore(file);
+    s.adminAction("admin", "reconcile", body);
+    assert.equal(s.state.withdrawals[0].status, "paid");
+    assert.equal(s.state.accounts["withdrawalClearing:" + w.id], 0);
+    assert.equal(s.state.accounts["providerFees:mtn"], 500);
+    assert.equal(
+      s.state.ledger.filter((l) => l.kind === "withdrawal").length,
+      1,
+    );
+    assert.equal(
+      s.state.ledger.filter((l) => l.kind === "withdrawal.fee").length,
+      1,
+    );
+  } finally {
+    rmSync(directory, { recursive: true, force: true });
+  }
 });

@@ -163,6 +163,7 @@ export function Button({
 }
 export function Field({
   label,
+  hint,
   value,
   onChangeText,
   placeholder,
@@ -171,6 +172,7 @@ export function Field({
   secureTextEntry = false,
 }: {
   label: string;
+  hint?: string;
   value: string;
   onChangeText: (s: string) => void;
   placeholder?: string;
@@ -183,6 +185,7 @@ export function Field({
       <Label>{label}</Label>
       <TextInput
         accessibilityLabel={label}
+        accessibilityHint={hint}
         secureTextEntry={secureTextEntry}
         value={value}
         onChangeText={onChangeText}
@@ -199,6 +202,7 @@ export function Field({
           multiline && { minHeight: 95, textAlignVertical: "top" },
         ]}
       />
+      {hint && <Text style={s.small}>{hint}</Text>}
     </View>
   );
 }

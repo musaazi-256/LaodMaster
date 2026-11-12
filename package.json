@@ -22,6 +22,7 @@
     "customer:web": "npm run web --workspace @loadmaster/customer",
     "driver:web": "npm run web --workspace @loadmaster/driver",
     "test:ui": "node scripts/ui-smoke.mjs",
+    "test:payments": "npm run admin:build && node scripts/payments-check.mjs",
     "test:flow": "npm run admin:build && node scripts/flow-check.mjs",
     "test:roles": "npm run admin:build && node scripts/role-check.mjs",
     "admin": "npm run dev --workspace @loadmaster/admin",

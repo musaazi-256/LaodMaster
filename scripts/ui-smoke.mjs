@@ -14,7 +14,8 @@ const browser = await chromium.launch({
   args: ["--no-sandbox"],
 });
 const errors = [];
-mkdirSync("audits/v2", { recursive: true });
+const out = process.argv[2] || "audits/v2";
+mkdirSync(out, { recursive: true });
 try {
   const make = async (role, port) => {
     const context = await browser.newContext({
@@ -55,10 +56,13 @@ try {
   };
   const { page: customer, context: customerContext } = await make(
     "customer",
-    8091,
+    Number(process.env.CUSTOMER_PORT || 8091),
   );
-  const { page: driver, context: driverContext } = await make("driver", 8092);
-  await customer.screenshot({ path: "audits/v2/customer-home.png" });
+  const { page: driver, context: driverContext } = await make(
+    "driver",
+    Number(process.env.DRIVER_PORT || 8092),
+  );
+  await customer.screenshot({ path: out + "/customer-home.png" });
   await expect(
     customer.getByRole("button", { name: "Previous artwork", exact: true }),
   ).toBeDisabled();
@@ -74,7 +78,7 @@ try {
   await expect(
     customer.getByText("Household moves", { exact: true }),
   ).toBeInViewport({ ratio: 1 });
-  await customer.screenshot({ path: "audits/v2/home-household-slide.png" });
+  await customer.screenshot({ path: out + "/home-household-slide.png" });
   await customer
     .getByRole("button", { name: "Next artwork", exact: true })
     .click();
@@ -84,7 +88,7 @@ try {
   await expect(
     customer.getByText("Business deliveries", { exact: true }),
   ).toBeInViewport({ ratio: 1 });
-  await customer.screenshot({ path: "audits/v2/home-business-slide.png" });
+  await customer.screenshot({ path: out + "/home-business-slide.png" });
   await customer
     .getByRole("button", {
       name: "Show artwork 1: Everyday cargo",
@@ -92,7 +96,7 @@ try {
     })
     .click();
 
-  await driver.screenshot({ path: "audits/v2/driver-home.png" });
+  await driver.screenshot({ path: out + "/driver-home.png" });
   await driver
     .getByRole("switch", { name: "Available for new orders" })
     .click();
@@ -164,7 +168,7 @@ try {
     .getByRole("button", { name: "Select Nakawa Market", exact: true })
     .click();
   await customer.screenshot({
-    path: "audits/v2/figma-order-locations-web.png",
+    path: out + "/figma-order-locations-web.png",
   });
   await customer
     .getByRole("button", { name: "Continue to truck selection", exact: true })
@@ -177,8 +181,12 @@ try {
     .getByRole("button", { name: "Cargo & contacts", exact: true })
     .click();
   await customer
+    .getByRole("button", { name: "Edit cargo item 1", exact: true })
+    .click();
+  await customer
     .getByLabel("Item 1 description", { exact: true })
     .fill("Furniture boxes");
+  await customer.getByRole("button", { name: "Done", exact: true }).click();
   await customer
     .getByRole("button", { name: "Add cargo item", exact: true })
     .click();
@@ -188,6 +196,7 @@ try {
   await customer
     .getByRole("radio", { name: "Item 2 to stop 2", exact: true })
     .click();
+  await customer.getByRole("button", { name: "Done", exact: true }).click();
   for (const i of [1, 2])
     await customer
       .getByRole("button", {
@@ -201,9 +210,19 @@ try {
       exact: true,
     })
     .click();
-  await customer.screenshot({ path: "audits/v2/cargo-contacts-web.png" });
+  await customer.screenshot({ path: out + "/cargo-contacts-web.png" });
   await customer
     .getByRole("button", { name: "Payment & pairing", exact: true })
+    .click();
+  store.adminAction("admin", "payment-method", {
+    method: "mtn",
+    enabled: false,
+  });
+  await expect(
+    customer.getByRole("radio", { name: "MTN Mobile Money", exact: true }),
+  ).toHaveCount(0, { timeout: 15000 });
+  await customer
+    .getByRole("radio", { name: "Airtel Money", exact: true })
     .click();
   await customer
     .getByLabel("Driver short number", { exact: true })
@@ -223,13 +242,17 @@ try {
       exact: true,
     })
     .click();
-  await customer.screenshot({ path: "audits/v2/cargo-review-web.png" });
+  await customer.screenshot({ path: out + "/cargo-review-web.png" });
   await customer
     .getByRole("button", { name: "Order a truck", exact: true })
     .click();
   await expect(
     customer.getByText("Awaiting your paired driver", { exact: true }),
   ).toBeVisible();
+  store.adminAction("admin", "payment-method", {
+    method: "mtn",
+    enabled: true,
+  });
 
   await customer
     .getByRole("button", { name: "Cancel order", exact: true })
@@ -238,7 +261,7 @@ try {
     customer.getByText("Are you sure?", { exact: true }),
   ).toBeVisible();
   await customer.screenshot({
-    path: "audits/v2/cancel-confirmation-sheet.png",
+    path: out + "/cancel-confirmation-sheet.png",
   });
   await customer
     .getByRole("button", { name: "Cancel order", exact: true })
@@ -249,14 +272,14 @@ try {
   ).toBeVisible();
   await expect(
     customer.getByRole("button", { name: "Confirm cancellation", exact: true }),
-  ).toBeDisabled();
+  ).toBeEnabled();
   await customer
     .getByRole("radio", { name: "Long pickup time", exact: true })
     .click();
   await expect(
     customer.getByRole("button", { name: "Confirm cancellation", exact: true }),
   ).toBeEnabled();
-  await customer.screenshot({ path: "audits/v2/cancel-reasons-sheet.png" });
+  await customer.screenshot({ path: out + "/cancel-reasons-sheet.png" });
   await customer
     .getByRole("button", { name: "Close reasons list", exact: true })
     .click();
@@ -264,7 +287,7 @@ try {
   await expect(
     driver.getByText("A new cargo request", { exact: true }),
   ).toBeVisible();
-  await driver.screenshot({ path: "audits/v2/driver-request.png" });
+  await driver.screenshot({ path: out + "/driver-request.png" });
   await driver
     .getByRole("button", { name: "Accept this order", exact: true })
     .click();
@@ -312,9 +335,7 @@ try {
   await driver
     .getByRole("button", { name: "Confirm delivery complete", exact: true })
     .click();
-  await customer
-    .getByRole("button", { name: "Continue to payment", exact: true })
-    .click();
+
   await expect(
     customer.getByText("Ready to approve?", { exact: true }),
   ).toBeVisible();
@@ -331,14 +352,19 @@ try {
   await expect(
     customer.getByText("Checking your payment", { exact: true }),
   ).toBeVisible();
-  await customer.screenshot({ path: "audits/v2/payment-uncertain.png" });
+  await customer.screenshot({ path: out + "/payment-uncertain.png" });
   await customer
     .getByRole("button", { name: "Check payment status", exact: true })
     .click();
+  await customer
+    .getByRole("button", { name: "View receipt", exact: true })
+    .click();
   await expect(
-    customer.getByText("Payment confirmed", { exact: true }),
+    customer
+      .locator("#root")
+      .getByRole("heading", { name: "Payment confirmed", exact: true }),
   ).toBeVisible();
-  await customer.screenshot({ path: "audits/v2/payment-receipt.png" });
+  await customer.screenshot({ path: out + "/payment-receipt.png" });
   await customer.reload();
   await customer.getByText("Hello, Alex", { exact: false }).waitFor();
   await expect(
@@ -370,7 +396,7 @@ try {
     customer.getByRole("button", { name: "Acacia Mall", exact: true }),
   ).toBeVisible();
 
-  await customer.screenshot({ path: "audits/v2/repeat-trip-review.png" });
+  await customer.screenshot({ path: out + "/repeat-trip-review.png" });
   await customer.reload();
   const admin = await browser.newPage({
     viewport: { width: 1440, height: 1000 },
@@ -411,20 +437,20 @@ try {
       .getByRole("button", { name: "Close", exact: true })
       .click();
   await admin.getByRole("link", { name: "Dashboard", exact: true }).click();
-  await admin.screenshot({ path: "audits/v2/admin-operations.png" });
+  await admin.screenshot({ path: out + "/admin-operations.png" });
   for (const [label, heading] of [
-    ["Drivers & vehicles", "Drivers & vehicles"],
-    ["Transfers & ledger", "Move funds with a clear trail."],
-    ["Support & disputes", "Keep every issue in view."],
-    ["Staff & roles", "The right access for every role."],
-    ["Reports", "See what’s moving your operation."],
+    ["Drivers", "Drivers"],
+    ["Transfers & ledger", "Transfers & ledger"],
+    ["Support", "Support"],
+    ["Staff & roles", "Staff & roles"],
+    ["Reports", "Reports"],
   ]) {
     await admin.getByRole("link", { name: label, exact: true }).click();
     await expect(
       admin.getByRole("heading", { name: heading, exact: true }),
     ).toBeVisible();
   }
-  await admin.screenshot({ path: "audits/v2/admin-reports.png" });
+  await admin.screenshot({ path: out + "/admin-reports.png" });
   for (const label of [
     "Trips",
     "Customers",
@@ -508,10 +534,15 @@ try {
   await customer
     .getByRole("button", { name: "Confirm cash payment", exact: true })
     .click();
+  await customer
+    .getByRole("button", { name: "View receipt", exact: true })
+    .click();
   await expect(
-    customer.getByText("Payment confirmed", { exact: true }),
+    customer
+      .locator("#root")
+      .getByRole("heading", { name: "Payment confirmed", exact: true }),
   ).toBeVisible();
-  await customer.screenshot({ path: "audits/v2/cash-receipt-web.png" });
+  await customer.screenshot({ path: out + "/cash-receipt-web.png" });
   await admin.getByRole("link", { name: "Collections", exact: true }).click();
   await admin
     .getByRole("button", { name: "Open " + cashOrder.id, exact: true })
@@ -542,7 +573,7 @@ try {
       exact: true,
     }),
   ).not.toBeVisible();
-  await admin.screenshot({ path: "audits/v2/cash-admin-reconciliation.png" });
+  await admin.screenshot({ path: out + "/cash-admin-reconciliation.png" });
   if (store.state.accounts["driverCash:driver-1"] !== 0)
     throw new Error(
       "Cash remittance must settle the driver-held platform amount",

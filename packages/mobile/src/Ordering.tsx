@@ -17,6 +17,7 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 import type { NativeStackScreenProps } from "@react-navigation/native-stack";
 import {
   methodLabels,
+  availablePaymentMethods,
   money,
   type Method,
   type Place,
@@ -944,58 +945,60 @@ export function ChooseTruck({
         charged.
       </Body>
       <Card>
-        {(["mtn", "airtel", "card"] as Method[]).map((m, i) => (
-          <Pressable
-            accessibilityRole="radio"
-            accessibilityState={{ checked: method === m }}
-            key={m}
-            onPress={() => setMethod(m)}
-          >
-            <Row style={{ paddingVertical: 10 }}>
-              <View
-                style={[
-                  s.iconCircle,
-                  {
-                    backgroundColor:
-                      m === "mtn"
-                        ? "#FFF4BE"
-                        : m === "airtel"
-                          ? "#FDE8E8"
-                          : C.mint,
-                  },
-                ]}
-              >
-                <Icon
-                  name={
-                    m === "card" ? "card-outline" : "phone-portrait-outline"
-                  }
-                  color={m === "airtel" ? "#AA3038" : C.ink}
-                />
-              </View>
-              <View style={{ flex: 1, gap: 4 }}>
-                <Text
-                  style={{
-                    fontWeight: "600",
-                    ...typography.subhead,
-                    color: C.ink,
-                  }}
+        {availablePaymentMethods(data)
+          .filter((m) => ["mtn", "airtel", "card"].includes(m))
+          .map((m, i) => (
+            <Pressable
+              accessibilityRole="radio"
+              accessibilityState={{ checked: method === m }}
+              key={m}
+              onPress={() => setMethod(m)}
+            >
+              <Row style={{ paddingVertical: 10 }}>
+                <View
+                  style={[
+                    s.iconCircle,
+                    {
+                      backgroundColor:
+                        m === "mtn"
+                          ? "#FFF4BE"
+                          : m === "airtel"
+                            ? "#FDE8E8"
+                            : C.mint,
+                    },
+                  ]}
                 >
-                  {methodLabels[m]}
-                </Text>
-                <Text style={s.small}>
-                  {m === "card"
-                    ? "Demo card ending 4242"
-                    : "Demo account ending 0111"}
-                </Text>
-              </View>
-              <Icon
-                name={method === m ? "radio-button-on" : "radio-button-off"}
-                color={method === m ? C.green : C.muted}
-              />
-            </Row>
-            {i < 2 && <View style={s.divider} />}
-          </Pressable>
-        ))}
+                  <Icon
+                    name={
+                      m === "card" ? "card-outline" : "phone-portrait-outline"
+                    }
+                    color={m === "airtel" ? "#AA3038" : C.ink}
+                  />
+                </View>
+                <View style={{ flex: 1, gap: 4 }}>
+                  <Text
+                    style={{
+                      fontWeight: "600",
+                      ...typography.subhead,
+                      color: C.ink,
+                    }}
+                  >
+                    {methodLabels[m]}
+                  </Text>
+                  <Text style={s.small}>
+                    {m === "card"
+                      ? "Demo card ending 4242"
+                      : "Demo account ending 0111"}
+                  </Text>
+                </View>
+                <Icon
+                  name={method === m ? "radio-button-on" : "radio-button-off"}
+                  color={method === m ? C.green : C.muted}
+                />
+              </Row>
+              {i < 2 && <View style={s.divider} />}
+            </Pressable>
+          ))}
       </Card>
       <Pressable
         accessibilityRole="button"
