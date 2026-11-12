@@ -15,7 +15,7 @@ const PANEL_WIDTH = 300;
 const RELAUNCH_KEY = "bc6ea04a-6629-4f1c-a65e-444f9843b925";
 const OWNER = "lm-handoff";
 const STORE_KEY = "lm-handoff-spec";
-const DEFAULT_SPEC: any = /*__SPEC__*/ null;
+const DEFAULT_SPEC: any = __SPEC__;
 
 type Parts = {
   foundations: boolean;
@@ -203,8 +203,9 @@ function button(label: string, v = "primary", web = false): FrameNode {
     align: "CENTER",
     justify: "CENTER",
   });
+  b.itemSpacing = 8;
   b.appendChild(
-    text(label, {
+    glyphText(label, {
       size: web ? 13 : 15,
       font: "s",
       color: primary ? "#FFFFFF" : danger ? (web ? T.destructive : T.red || "#B13B43") : ghost ? T.green : web ? T.foreground : T.ink,
@@ -228,6 +229,39 @@ function toggleShape(on: boolean): FrameNode {
   t.appendChild(k);
   return t;
 }
+
+/**
+ * Vector icons (Lucide-style 24 px strokes) drawn with createNodeFromSvg.
+ * Unicode symbols such as ⌕ ▢ ◇ 🔔 are missing from Inter and render blank
+ * in Figma, so every icon is a real vector layer.
+ */
+// Filled from spec.icons at generate time (keeps this file under the upload limit).
+let ICON_PATHS: Record<string, string> = { dot: '<circle cx="12" cy="12" r="5" fill="C"/>' };
+/** Text glyphs used by older specs, mapped to vector icons. */
+const GLYPH_ICON: Record<string, string> = {
+  "▭": "card", "▣": "wallet", "▤": "package", "✓": "check", "➤": "navigation",
+  "⚑": "flag", "⌖": "locate", "●": "dot", "◎": "ring", "◉": "dot", "🏆": "trophy",
+};
+function icon(name: string, size = 16, color = "#18181B", stroke = 2): FrameNode {
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="${color}" stroke-width="${stroke}" stroke-linecap="round" stroke-linejoin="round">${(ICON_PATHS[name] || ICON_PATHS.dot).replace(/"C"/g, `"${color}"`)}</svg>`;
+  const n = figma.createNodeFromSvg(svg);
+  n.name = "Icon / " + name;
+  n.fills = [];
+  n.clipsContent = false;
+  n.rescale(size / 24);
+  return n;
+}
+const iconNode = (n: string, size?: number, color?: string, stroke?: number) => icon(n, size, color, stroke);
+/** "⌖  Use my location" → [icon] Use my location; plain strings stay text. */
+function glyphText(chars: string, o: TextOpts = {}, iconColor?: string): SceneNode {
+  const m = String(chars).match(/^(\S{1,2})\s+([\s\S]*)$/);
+  const name = m && GLYPH_ICON[m[1]];
+  if (!name) return text(chars, o);
+  const row = box("Line", "HORIZONTAL", { gap: 8, align: "CENTER" });
+  row.appendChild(icon(name, Math.round((o.size || 14) * 1.05), iconColor || o.color || T.ink || "#142D28"));
+  row.appendChild(text(m![2], o));
+  return row;
+}
 function circle(size: number, fill: string, stroke?: string): EllipseNode {
   const c = figma.createEllipse();
   c.resize(size, size);
@@ -239,103 +273,109 @@ function circle(size: number, fill: string, stroke?: string): EllipseNode {
   return c;
 }
 
-/** Stylised map: blocks, roads, a planned route, pins and trucks. */
+/** Street-map look of the apps' map: light blocks, white roads, place labels. */
 async function mapArt(w: number, h: number, o: any): Promise<FrameNode> {
   const f = figma.createFrame();
-  f.name = "Map (MapLibre on device)";
+  f.name = "Map";
   f.resize(w, h);
-  f.cornerRadius = o.wide ? 13 : 18;
-  f.fills = [solid("#E6EEE4")];
+  f.cornerRadius = o.wide ? 8 : 16;
+  f.fills = [solid("#EEF1F5")];
   f.clipsContent = true;
-  for (let i = 0; i < 9; i++) {
+  for (let i = 0; i < 16; i++) {
     const r = figma.createRectangle();
-    r.resize(((i * 37) % 70) + 50, ((i * 53) % 40) + 30);
-    r.x = ((i * 97) % Math.max(60, w - 80)) + 10;
-    r.y = ((i * 61) % Math.max(40, h - 60)) + 8;
-    r.cornerRadius = 6;
-    r.fills = [solid("#D9E5D6")];
+    r.resize(((i * 41) % 70) + 36, ((i * 29) % 46) + 26);
+    r.x = (i * 113) % Math.max(60, w - 40);
+    r.y = (i * 71) % Math.max(40, h - 30);
+    r.cornerRadius = 2;
+    r.fills = [solid("#E1E6ED")];
     f.appendChild(r);
   }
-  const roads = figma.createVector();
-  f.appendChild(roads);
-  await roads.setVectorNetworkAsync({
-    vertices: [
-      { x: 0, y: h * 0.35 },
-      { x: w, y: h * 0.42 },
-      { x: w * 0.3, y: 0 },
-      { x: w * 0.42, y: h },
-      { x: w * 0.7, y: 0 },
-      { x: w * 0.62, y: h },
-    ],
-    segments: [
-      { start: 0, end: 1 },
-      { start: 2, end: 3 },
-      { start: 4, end: 5 },
-    ],
-  });
-  roads.strokes = [solid("#FFFFFF")];
-  roads.strokeWeight = 7;
-  const a = { x: w * 0.18, y: h * 0.72 };
-  const b = { x: w * 0.82, y: h * 0.26 };
+  const paths = [
+    `M -10 ${h * 0.28} C ${w * 0.3} ${h * 0.12} ${w * 0.62} ${h * 0.46} ${w + 10} ${h * 0.32}`,
+    `M ${w * 0.22} -10 C ${w * 0.34} ${h * 0.4} ${w * 0.12} ${h * 0.7} ${w * 0.28} ${h + 10}`,
+    `M -10 ${h * 0.82} C ${w * 0.4} ${h * 0.7} ${w * 0.72} ${h * 0.92} ${w + 10} ${h * 0.74}`,
+    `M ${w * 0.7} -10 L ${w * 0.62} ${h + 10}`,
+  ];
+  for (const [color, weight] of [["#CDD5E0", 11], ["#FFFFFF", 8]] as [string, number][]) {
+    const v = figma.createVector();
+    v.name = "Roads";
+    f.appendChild(v);
+    v.vectorPaths = paths.map((data) => ({ windingRule: "NONE" as const, data }));
+    v.strokes = [solid(color)];
+    v.strokeWeight = weight;
+    v.x = -10;
+    v.y = -10;
+  }
+  for (const [label, x, y] of [["KAMPALA", 0.08, 0.16], ["NTINDA", 0.72, 0.1], ["NAKAWA", 0.74, 0.9], ["KOLOLO", 0.06, 0.94]] as [string, number, number][]) {
+    const t = text(label, { size: 9, font: "m", color: "#5B6472", ls: 8 });
+    f.appendChild(t);
+    t.x = x * w;
+    t.y = y * h - 6;
+  }
+  const a = { x: w * 0.3, y: h * 0.66 };
+  const b = { x: w * 0.68, y: h * 0.3 };
   if (o.route !== false) {
     const route = figma.createVector();
     f.appendChild(route);
-    await route.setVectorNetworkAsync({
-      vertices: [a, { x: w * 0.38, y: h * 0.38 }, { x: w * 0.64, y: h * 0.52 }, b],
-      segments: [
-        { start: 0, end: 1 },
-        { start: 1, end: 2 },
-        { start: 2, end: 3 },
-      ],
-    });
-    route.strokes = [solid(T.green || "#08784D")];
+    route.vectorPaths = [{ windingRule: "NONE", data: `M 0 ${a.y - b.y} L ${w * 0.12} ${a.y - h * 0.5} L ${w * 0.25} ${a.y - h * 0.5} L ${b.x - a.x} 0` }];
+    route.strokes = [solid(T.green || "#087443")];
     route.strokeWeight = 4;
     route.strokeCap = "ROUND";
     route.strokeJoin = "ROUND";
-    const p1 = circle(16, "#FFFFFF", T.green || "#08784D");
+    route.x = a.x;
+    route.y = b.y;
+    const p1 = circle(16, "#FFFFFF", T.green || "#087443");
     p1.x = a.x - 8;
     p1.y = a.y - 8;
     f.appendChild(p1);
-    const p2 = circle(16, T.green || "#08784D", "#FFFFFF");
+    const p2 = circle(16, "#3B66F5", "#FFFFFF");
     p2.x = b.x - 8;
     p2.y = b.y - 8;
     f.appendChild(p2);
-  }
-  const trucks = o.trucks || 0;
-  for (let i = 0; i < trucks; i++) {
-    const t = o.progress ?? (trucks === 1 ? 0.25 : i / trucks);
-    const tr = figma.createRectangle();
-    tr.resize(20, 12);
-    tr.cornerRadius = 4;
-    tr.fills = [solid(T.ink || "#142D28")];
-    tr.x = trucks === 1 ? a.x + (b.x - a.x) * t - 10 : ((i * 211) % (w - 40)) + 20;
-    tr.y = trucks === 1 ? a.y + (b.y - a.y) * t - 6 : ((i * 131) % (h - 40)) + 20;
-    f.appendChild(tr);
-  }
-  if (o.label) {
-    const lb = box("Map label", "HORIZONTAL", { p: [5, 10, 5, 10], r: 8, fill: "#FFFFFF" });
-    lb.appendChild(text("➤  " + o.label, { size: 10, font: "s", color: T.ink || "#142D28", ls: 4 }));
-    f.appendChild(lb);
-    lb.x = 12;
-    lb.y = h - 40;
+    if (o.trucks) {
+      const t = o.progress ?? 0.35;
+      const tr = box("Truck", "HORIZONTAL", { w: 20, h: 20, r: 5, fill: "#2563EB", stroke: "#FFFFFF" });
+      f.appendChild(tr);
+      tr.x = a.x + (b.x - a.x) * t - 10;
+      tr.y = a.y + (b.y - a.y) * t - 10;
+    }
   }
   if (o.pulse) {
     const cx = o.route === false ? w / 2 : a.x;
     const cy = o.route === false ? h / 2 : a.y;
-    const ring = circle(60, T.green || "#08784D");
-    ring.opacity = 0.12;
-    ring.x = cx - 30;
-    ring.y = cy - 30;
-    f.appendChild(ring);
-    const dot = circle(14, T.green || "#08784D", "#FFFFFF");
-    dot.x = cx - 7;
-    dot.y = cy - 7;
+    for (const [d, op] of [[Math.min(150, h * 0.6), 0.16], [Math.min(92, h * 0.38), 0.3]] as [number, number][]) {
+      const ring = circle(d, "#22A35A");
+      ring.opacity = op;
+      ring.x = cx - d / 2;
+      ring.y = cy - d / 2;
+      f.appendChild(ring);
+    }
+    const dot = circle(16, T.green || "#087443", "#FFFFFF");
+    dot.x = cx - 8;
+    dot.y = cy - 8;
     f.appendChild(dot);
+  }
+  if (o.label) {
+    const lb = box("Map label", "HORIZONTAL", { p: [6, 12, 6, 10], r: 999, gap: 6, fill: "#FFFFFF", align: "CENTER" });
+    lb.appendChild(icon("navigation", 11, T.ink || "#18352B"));
+    lb.appendChild(text(o.label, { size: 10, font: "s", color: T.ink || "#18352B", ls: 4 }));
+    f.appendChild(lb);
+    lb.x = 12;
+    lb.y = h - 38;
+  }
+  if (o.wide) {
+    const z = box("Zoom", "VERTICAL", { w: 30, r: 6, fill: "#FFFFFF", stroke: "#D4D4D8", align: "CENTER" });
+    for (const n of ["plus", "minus"]) {
+      const k = add(z, box("Zoom " + n, "HORIZONTAL", { w: 30, h: 30, align: "CENTER", justify: "CENTER" }));
+      k.appendChild(icon(n, 15, "#18181B", 2.5));
+    }
+    f.appendChild(z);
+    z.x = w - 42;
+    z.y = 12;
   }
   return f;
 }
 
-// ---------------------------------------------------------------- mobile blocks
 const MW = 390;
 const CW = MW - 40;
 
@@ -345,7 +385,9 @@ function kvRow(parent: FrameNode, k: string, v: string, bold = false, web = fals
   r.appendChild(text(v, { size: web ? 13 : 14, font: bold ? "b" : "s", color: web ? T.foreground : T.ink }));
 }
 function cardFrame(name: string, web = false): FrameNode {
-  return box(name, "VERTICAL", { p: web ? 18 : 16, gap: 10, fill: "#FFFFFF", r: web ? 13 : 18, stroke: web ? T.border : T.line });
+  const c = box(name, "VERTICAL", { p: web ? 18 : 16, gap: 10, fill: "#FFFFFF", r: web ? 13 : 18, stroke: web ? T.border : T.line });
+  if (!web) c.effects = [{ type: "DROP_SHADOW", color: { r: 0, g: 0, b: 0, a: 0.05 }, offset: { x: 0, y: 2 }, radius: 6, spread: 0, visible: true, blendMode: "NORMAL" }];
+  return c;
 }
 
 async function mobileBlock(parent: FrameNode, b: any, ctx: any): Promise<void> {
@@ -355,7 +397,7 @@ async function mobileBlock(parent: FrameNode, b: any, ctx: any): Promise<void> {
       return;
     }
     case "eyebrow":
-      para(parent, b.text, { size: 11, font: "s", color: T.green, ls: 6 });
+      para(parent, b.text, { size: 12, font: "b", color: T.muted, ls: 4 });
       return;
     case "title":
       para(parent, b.text, { size: 26, font: "b", lh: 118 });
@@ -396,7 +438,7 @@ async function mobileBlock(parent: FrameNode, b: any, ctx: any): Promise<void> {
     case "topbanner": {
       const f = add(parent, box("Request banner", "HORIZONTAL", { p: 12, r: 12, fill: T.green, justify: "SPACE_BETWEEN", align: "CENTER" }), true);
       f.appendChild(text(b.text, { size: 12, font: "b", color: "#FFFFFF" }));
-      f.appendChild(text("→", { size: 16, font: "b", color: "#FFFFFF" }));
+      f.appendChild(icon("arrow-right", 16, "#FFFFFF"));
       return;
     }
     case "empty": {
@@ -409,11 +451,11 @@ async function mobileBlock(parent: FrameNode, b: any, ctx: any): Promise<void> {
     case "greet": {
       const r = add(parent, box("Greeting", "HORIZONTAL", { justify: "SPACE_BETWEEN", align: "CENTER" }), true);
       const l = box("Hello", "VERTICAL", { gap: 5 });
-      l.appendChild(text("LOADMASTER / " + (b.role || "CARGO, CONNECTED"), { size: 11, font: "s", color: T.green, ls: 6 }));
+      l.appendChild(text("LOADMASTER / " + (b.role || "CARGO, CONNECTED"), { size: 12, font: "b", color: T.muted, ls: 4 }));
       l.appendChild(text(`Hello, ${b.name} ↗`, { size: 20, font: "b" }));
       r.appendChild(l);
       const bell = box("Updates", "HORIZONTAL", { w: 43, h: 43, r: 22, fill: T.mint, align: "CENTER", justify: "CENTER" });
-      bell.appendChild(text("🔔", { size: 16 }));
+      bell.appendChild(icon("bell", 18, T.green));
       r.appendChild(bell);
       return;
     }
@@ -443,7 +485,7 @@ async function mobileBlock(parent: FrameNode, b: any, ctx: any): Promise<void> {
       if (b.body) para(f, b.body, { size: 13, color: "#DDEBE2" });
       if (b.lines || b.rows || b.badge) {
         const inner = add(f, box("Request", "VERTICAL", { p: 16, gap: 10, r: 14, fill: "#FFFFFF" }), true);
-        for (const l of b.lines || []) para(inner, l, { size: 14, font: "m" });
+        for (const l of b.lines || []) add(inner, glyphText(l, { size: 14, font: "m" }, T.green), !/^\S{1,2}\s/.test(l));
         if (b.badge) {
           const r = spacerRow(inner);
           r.appendChild(pill(b.badge[0], b.badge[1]));
@@ -480,7 +522,7 @@ async function mobileBlock(parent: FrameNode, b: any, ctx: any): Promise<void> {
       for (const [k, v] of b.rows || []) kvRow(f, k, v, k === "Total" || /earning|total/i.test(k));
       if (b.stars) {
         const r = spacerRow(f, 6);
-        for (let i = 0; i < 5; i++) r.appendChild(text("★", { size: 24, color: i < b.stars ? "#E2A400" : T.line }));
+        for (let i = 0; i < 5; i++) r.appendChild(icon("star", 26, i < b.stars ? "#E2A400" : T.line, 1.5));
       }
       if (b.btns) {
         const r = spacerRow(f, 10);
@@ -513,8 +555,8 @@ async function mobileBlock(parent: FrameNode, b: any, ctx: any): Promise<void> {
     case "list": {
       const f = add(parent, box("List", "VERTICAL", { fill: b.plain ? null : "#FFFFFF", r: 18, stroke: b.plain ? undefined : T.line }), true);
       b.items.forEach((it: any, i: number) => {
-        if (b.plain && !it.badge) it = { ...it, title: "◎  " + it.title };
         const row = add(f, box("Item / " + it.title, "HORIZONTAL", { p: [14, 16, 14, 16], gap: 10, align: "CENTER", stroke: undefined }), true);
+        if (b.plain && !it.badge) row.appendChild(icon("pin", 18, T.muted));
         if (i) {
           row.strokes = [solid(T.line)];
           row.strokeTopWeight = 1;
@@ -553,6 +595,35 @@ async function mobileBlock(parent: FrameNode, b: any, ctx: any): Promise<void> {
     }
     case "menu": {
       const f = add(parent, box("Menu", "VERTICAL", { fill: "#FFFFFF", r: 18, stroke: T.line }), true);
+      if (Array.isArray(b.items[0])) {
+        f.paddingLeft = f.paddingRight = 16;
+        b.items.forEach(([ic, t1, t2]: string[], i: number) => {
+          const row = add(f, box("Menu / " + t1, "HORIZONTAL", { p: [15, 0, 15, 0], gap: 14, align: "CENTER" }), true);
+          if (i) {
+            row.strokes = [solid(T.line)];
+            row.strokeTopWeight = 1;
+            row.strokeBottomWeight = row.strokeLeftWeight = row.strokeRightWeight = 0;
+          }
+          row.appendChild(icon(ic, 21, T.green, 1.75));
+          const col = add(row, box("Text", "VERTICAL", { gap: 3 }));
+          col.layoutGrow = 1;
+          add(col, text(t1, { size: 15, font: "s" }), true);
+          if (t2) add(col, text(t2, { size: 12, color: T.muted }), true);
+          row.appendChild(icon("chevron-right", 18, T.ink));
+        });
+        if (b.more) {
+          const m = add(parent, box("More options", "HORIZONTAL", { p: [6, 0, 6, 0], justify: "SPACE_BETWEEN", align: "CENTER" }), true);
+          m.appendChild(text(b.more, { size: 13, color: T.muted }));
+          m.appendChild(icon("chevron-down", 18, T.muted));
+        }
+        if (b.logout) {
+          const l = add(parent, box("Log out", "HORIZONTAL", { p: [14, 0, 8, 0], gap: 14, align: "CENTER" }), true);
+          l.appendChild(icon("log-out", 20, T.ink, 1.75));
+          l.appendChild(text(b.logout, { size: 15, font: "m" }));
+        }
+        if (b.foot) para(parent, b.foot, { size: 12, color: T.muted });
+        return;
+      }
       b.items.forEach((label: string, i: number) => {
         const row = add(f, box("Menu / " + label, "HORIZONTAL", { p: [15, 16, 15, 16], justify: "SPACE_BETWEEN", align: "CENTER" }), true);
         if (i) {
@@ -563,15 +634,17 @@ async function mobileBlock(parent: FrameNode, b: any, ctx: any): Promise<void> {
           row.strokeRightWeight = 0;
         }
         row.appendChild(text(label, { size: 15, font: "m", color: label === "Sign out" ? T.red : T.ink }));
-        row.appendChild(text("›", { size: 18, color: T.muted }));
+        row.appendChild(icon("chevron-right", 18, T.muted));
       });
       return;
     }
     case "toggle": {
       const r = add(parent, box("Toggle / " + b.label, "HORIZONTAL", { p: 16, gap: 12, r: 18, fill: "#FFFFFF", stroke: T.line, justify: "SPACE_BETWEEN", align: "CENTER" }), true);
-      const t = add(r, text(b.label, { size: 14, font: "m", lh: 135 }));
+      const [t1, t2] = String(b.label).split(" · ");
+      const t = add(r, box("Text", "VERTICAL", { gap: 4 }));
       t.layoutGrow = 1;
-      t.textAutoResize = "HEIGHT";
+      add(t, text(t1, { size: t2 ? 18 : 14, font: t2 ? "b" : "m", lh: 125 }), true);
+      if (t2) add(t, text(t2, { size: 14, color: T.muted, lh: 135 }), true);
       const sw = toggleShape(!!b.on);
       if (b.disabled) sw.opacity = 0.4;
       r.appendChild(sw);
@@ -588,7 +661,7 @@ async function mobileBlock(parent: FrameNode, b: any, ctx: any): Promise<void> {
         if (s === String(b.value)) c.appendChild(text(s, { size: 15, font: "b" }));
         else {
           const k = box(s === "+" ? "Add" : "Remove", "HORIZONTAL", { w: 42, h: 42, r: 12, stroke: T.line, fill: "#FFFFFF", align: "CENTER", justify: "CENTER" });
-          k.appendChild(text(s, { size: 18 }));
+          k.appendChild(icon(s === "+" ? "plus" : "minus", 18, T.ink));
           c.appendChild(k);
         }
       }
@@ -633,10 +706,11 @@ async function mobileBlock(parent: FrameNode, b: any, ctx: any): Promise<void> {
       const r = add(parent, box("Greeting", "HORIZONTAL", { justify: "SPACE_BETWEEN", align: "CENTER" }), true);
       const l = add(r, box("Hello", "VERTICAL", { gap: 4 }));
       l.layoutGrow = 1;
-      add(l, text(b.hello, { size: 14, font: "m", color: T.muted }), true);
-      add(l, text(b.title, { size: 24, font: "b", lh: 115 }), true);
+      if (b.brand) add(l, text(b.brand, { size: 16, font: "b", color: T.green }), true);
+      add(l, text(b.hello, { size: 15, font: "s", color: T.muted }), true);
+      add(l, text(b.title, { size: b.brand ? 20 : 24, font: "b", lh: 120 }), true);
       const bell = box("Notifications", "HORIZONTAL", { w: 44, h: 44, r: 22, fill: "#FFFFFF", stroke: T.line, align: "CENTER", justify: "CENTER" });
-      bell.appendChild(text("🔔", { size: 15 }));
+      bell.appendChild(icon("bell", 18, T.ink));
       r.appendChild(bell);
       return;
     }
@@ -654,20 +728,20 @@ async function mobileBlock(parent: FrameNode, b: any, ctx: any): Promise<void> {
       t.layoutGrow = 1;
       t.textAutoResize = "HEIGHT";
       const tile = box("Truck", "HORIZONTAL", { w: 60, h: 60, r: 14, fill: "#FFFFFF", fillOpacity: 0.7, align: "CENTER", justify: "CENTER" });
-      tile.appendChild(text("🚚", { size: 22 }));
+      tile.appendChild(icon("truck", 28, T.green, 1.75));
       row.appendChild(tile);
       return;
     }
     case "ctabar": {
       const f = add(parent, box("Primary action", "HORIZONTAL", { p: 16, gap: 14, r: 18, fill: T.green, align: "CENTER" }), true);
       const ic = box("Icon", "HORIZONTAL", { w: 40, h: 40, r: 10, fill: "#FFFFFF", fillOpacity: 0.16, align: "CENTER", justify: "CENTER" });
-      ic.appendChild(text("⌖", { size: 18, color: "#FFFFFF" }));
+      ic.appendChild(icon(b.icon || "pin", 20, "#FFFFFF"));
       f.appendChild(ic);
       const col = add(f, box("Text", "VERTICAL", { gap: 2 }));
       col.layoutGrow = 1;
       add(col, text(b.title, { size: 17, font: "b", color: "#FFFFFF" }), true);
       if (b.sub) add(col, text(b.sub, { size: 12, color: "#DDF3E6" }), true);
-      f.appendChild(text("→", { size: 20, color: "#FFFFFF" }));
+      f.appendChild(icon("arrow-right", 20, "#FFFFFF"));
       return;
     }
     case "tiles": {
@@ -676,7 +750,8 @@ async function mobileBlock(parent: FrameNode, b: any, ctx: any): Promise<void> {
       for (const label of b.items) {
         const tl = add(r, box("Tile / " + label, "VERTICAL", { p: [14, 6, 14, 6], gap: 8, r: 16, fill: "#FFFFFF", stroke: T.line, align: "CENTER" }));
         tl.layoutGrow = 1;
-        tl.appendChild(circle(22, "none", T.green));
+        const tileIcons: Record<string, string> = { schedule: "calendar", order: "history", choose: "truck", match: "user-plus", estimate: "tag", support: "support" };
+        tl.appendChild(icon(tileIcons[String(label).split(/\s/)[0].toLowerCase()] || "dot", 24, T.green, 1.75));
         add(tl, text(label, { size: 12, font: "s", align: "CENTER", lh: 125 }), true);
       }
       return;
@@ -684,8 +759,8 @@ async function mobileBlock(parent: FrameNode, b: any, ctx: any): Promise<void> {
     case "wallet": {
       const f = add(parent, cardFrame("Wallet"), true);
       const top = add(f, box("Top", "HORIZONTAL", { justify: "SPACE_BETWEEN", align: "CENTER" }), true);
-      top.appendChild(text("▣  " + b.label, { size: 13, color: T.muted }));
-      top.appendChild(text("👁", { size: 14 }));
+      top.appendChild(glyphText("▣  " + b.label, { size: 13, color: T.muted }));
+      top.appendChild(icon("eye", 16, T.muted));
       const row = add(f, box("Row", "HORIZONTAL", { justify: "SPACE_BETWEEN", align: "CENTER" }), true);
       row.appendChild(text(b.value, { size: 22, font: "b" }));
       const pl = box("Add funds", "HORIZONTAL", { p: [9, 14, 9, 14], r: 999, fill: T.mint });
@@ -712,6 +787,142 @@ async function mobileBlock(parent: FrameNode, b: any, ctx: any): Promise<void> {
         bub.appendChild(text(msg, { size: 14, color: who === "me" ? "#FFFFFF" : T.ink }));
         row.appendChild(bub);
       }
+      return;
+    }
+    case "carousel": {
+      // HomeArtworkSlider: label pill, headline, body, photo artwork, arrows and dots.
+      const f = add(parent, box("Artwork / " + b.pill, "VERTICAL", { h: 262, p: [18, 18, 14, 18], gap: 10, r: 22, fill: "#E9F5EE", stroke: "#D8EBDF", clip: true }), true);
+      const art = box("Artwork photo", "HORIZONTAL", { w: 170, h: 140, r: 14, fill: "#CFE5D7", align: "CENTER", justify: "CENTER" });
+      art.appendChild(icon(b.art || "truck", 80, T.green, 1.25));
+      f.appendChild(art);
+      art.layoutPositioning = "ABSOLUTE";
+      art.x = CW - 182;
+      art.y = 52;
+      const pl = add(f, box("Pill", "HORIZONTAL", { p: [5, 10, 5, 10], r: 999, fill: "#FFFFFF", stroke: "#BFE3CB", gap: 6, align: "CENTER" }));
+      pl.appendChild(circle(6, T.green));
+      pl.appendChild(text(b.pill, { size: 12, font: "s", color: T.green }));
+      const tt = add(f, text(b.title, { size: 26, font: "b", lh: 112 }));
+      tt.resize(170, tt.height);
+      tt.textAutoResize = "HEIGHT";
+      const bd = add(f, text(b.body, { size: 12, color: "#33413B", lh: 140 }));
+      bd.resize(150, bd.height);
+      bd.textAutoResize = "HEIGHT";
+      const nav = box("Controls", "HORIZONTAL", { w: CW - 36, justify: "SPACE_BETWEEN", align: "CENTER" });
+      f.appendChild(nav);
+      nav.layoutPositioning = "ABSOLUTE";
+      nav.x = 18;
+      nav.y = 204;
+      const btn = (n: string, on: boolean) => {
+        const k = box(n, "HORIZONTAL", { w: 42, h: 42, r: 21, fill: "#FFFFFF", fillOpacity: on ? 1 : 0.6, align: "CENTER", justify: "CENTER" });
+        k.appendChild(icon(n, 18, on ? T.ink : "#9CA3AF"));
+        return k;
+      };
+      nav.appendChild(btn("chevron-left", false));
+      const dots = box("Dots", "HORIZONTAL", { p: [10, 14, 10, 14], gap: 8, r: 999, fill: "#FFFFFF", fillOpacity: 0.7, align: "CENTER" });
+      for (let i = 0; i < 3; i++) dots.appendChild(box("Dot", "HORIZONTAL", { w: i === (b.at || 0) ? 20 : 6, h: 6, r: 3, fill: i === (b.at || 0) ? T.ink : "#9CA3AF" }));
+      nav.appendChild(dots);
+      nav.appendChild(btn("chevron-right", true));
+      return;
+    }
+    case "search": {
+      const r = add(parent, box("Search", "HORIZONTAL", { h: 46, p: [0, 16, 0, 16], gap: 10, r: 999, fill: "#FFFFFF", stroke: T.line, align: "CENTER" }), true);
+      r.appendChild(icon("search", 18, T.muted));
+      r.appendChild(text(b.ph, { size: 15, color: T.muted }));
+      return;
+    }
+    case "tabsline": {
+      const r = add(parent, box("Tabs", "HORIZONTAL", { gap: 18, align: "MAX" }), true);
+      r.strokes = [solid(T.line)];
+      r.strokeTopWeight = r.strokeLeftWeight = r.strokeRightWeight = 0;
+      r.strokeBottomWeight = 1;
+      b.items.forEach((label: string, i: number) => {
+        const on = i === (b.sel || 0);
+        const t = box("Tab / " + label, "VERTICAL", { p: [0, 2, 10, 2] });
+        if (on) {
+          t.strokes = [solid(T.green)];
+          t.strokeTopWeight = t.strokeLeftWeight = t.strokeRightWeight = 0;
+          t.strokeBottomWeight = 2;
+        }
+        t.appendChild(text(label, { size: 13, font: on ? "s" : "r", color: on ? T.green : T.muted }));
+        r.appendChild(t);
+      });
+      return;
+    }
+    case "ordercards": {
+      for (const it of b.items) {
+        const c = add(parent, cardFrame("Order / " + it.id), true);
+        const hd = add(c, box("Head", "HORIZONTAL", { justify: "SPACE_BETWEEN", align: "CENTER" }), true);
+        hd.appendChild(text(it.id, { size: 13, font: "b", color: T.muted }));
+        hd.appendChild(pill(it.badge, it.tone || "green"));
+        [it.from, it.to].forEach((place: string, i: number) => {
+          const row = add(c, box("Stop", "HORIZONTAL", { gap: 12, align: "CENTER" }), true);
+          row.appendChild(circle(12, "#FFFFFF", i ? "#3B66F5" : T.green));
+          row.appendChild(text(place, { size: 14, font: "s", color: i ? "#2F5BD9" : T.ink }));
+        });
+        const ft = add(c, box("Foot", "HORIZONTAL", { p: [10, 0, 0, 0], justify: "SPACE_BETWEEN", align: "CENTER" }), true);
+        ft.strokes = [solid(T.line)];
+        ft.strokeTopWeight = 1;
+        ft.strokeBottomWeight = ft.strokeLeftWeight = ft.strokeRightWeight = 0;
+        ft.appendChild(text(it.price, { size: 17 }));
+        ft.appendChild(icon("arrow-right", 18, T.green));
+      }
+      return;
+    }
+    case "profilehead": {
+      const r = add(parent, box("Profile", "HORIZONTAL", { gap: 14, align: "CENTER", p: [4, 0, 8, 0] }), true);
+      const av = box("Avatar", "HORIZONTAL", { w: 54, h: 54, r: 27, fill: T.mint, align: "CENTER", justify: "CENTER" });
+      av.appendChild(text(b.initials, { size: 18, font: "b", color: T.green }));
+      r.appendChild(av);
+      const col = add(r, box("Text", "VERTICAL", { gap: 3 }));
+      col.layoutGrow = 1;
+      col.appendChild(text(b.name, { size: 17, font: "b" }));
+      col.appendChild(text(b.sub, { size: 13, color: T.muted }));
+      r.appendChild(icon("chevron-right", 20, T.muted));
+      return;
+    }
+    case "payact": {
+      for (const it of b.items) {
+        const c = add(parent, cardFrame("Payment / " + it.amount), true);
+        const top = add(c, box("Top", "HORIZONTAL", { gap: 12, align: "CENTER" }), true);
+        const ic = box("Icon", "HORIZONTAL", { w: 46, h: 46, r: 23, fill: T.mint, align: "CENTER", justify: "CENTER" });
+        ic.appendChild(icon(it.icon || "phone", 20, T.green, 1.75));
+        top.appendChild(ic);
+        const col = add(top, box("Text", "VERTICAL", { gap: 3 }));
+        col.layoutGrow = 1;
+        col.appendChild(text(it.amount, { size: 16, font: "b" }));
+        col.appendChild(text(it.sub, { size: 12, color: T.muted }));
+        top.appendChild(icon("chevron-right", 18, T.ink, 2.25));
+        if (it.badge) add(c, box("Badges", "HORIZONTAL", {}), true).appendChild(pill(it.badge, it.tone || "green"));
+        if (it.note) para(c, it.note, { size: 12, color: T.muted });
+      }
+      return;
+    }
+    case "progress": {
+      const t = add(parent, box("Progress", "HORIZONTAL", { h: 8, r: 4, fill: "#E5E7EB", clip: true }), true);
+      t.appendChild(box("Done", "HORIZONTAL", { w: Math.max(8, CW * (b.value ?? 1)), h: 8, r: 4, fill: "#16A34A" }));
+      return;
+    }
+    case "drivercard": {
+      const c = add(parent, box("Driver", "HORIZONTAL", { p: 16, gap: 16, r: 14, fill: "#EEF8F1", stroke: "#86C99B", align: "CENTER" }), true);
+      c.appendChild(icon(b.icon || "truck", 40, T.green, 1.5));
+      const col = add(c, box("Text", "VERTICAL", { gap: 4 }));
+      col.layoutGrow = 1;
+      col.appendChild(text(b.title, { size: 15, font: "b" }));
+      col.appendChild(text(b.sub, { size: 13, color: T.muted }));
+      return;
+    }
+    case "routeline": {
+      if (b.title) para(parent, b.title, { size: 20, font: "b" });
+      const f = add(parent, box("Route", "VERTICAL", { gap: 14 }), true);
+      b.stops.forEach(([label, name, area]: string[], i: number) => {
+        const blue = i === b.stops.length - 1;
+        const row = add(f, box("Stop / " + label, "HORIZONTAL", { gap: 14 }), true);
+        row.appendChild(circle(14, "#FFFFFF", blue ? "#3B66F5" : T.green));
+        const col = add(row, box("Text", "VERTICAL", { gap: 2 }));
+        col.appendChild(text(label, { size: 13, font: "s", color: T.muted }));
+        col.appendChild(text(name, { size: 15, font: "s", color: blue ? "#2F5BD9" : T.ink }));
+        if (area) col.appendChild(text(area, { size: 12, color: T.muted }));
+      });
       return;
     }
     case "footer":
@@ -748,7 +959,7 @@ async function celebrationOverlay(f: FrameNode, c: any): Promise<void> {
   card.layoutPositioning = "ABSOLUTE";
   const badge = box("Badge", "HORIZONTAL", { w: 92, h: 92, r: 46, fill: ring, align: "CENTER", justify: "CENTER" });
   const inner = box("Icon", "HORIZONTAL", { w: 64, h: 64, r: 32, fill, align: "CENTER", justify: "CENTER" });
-  inner.appendChild(text(c.glyph || "✓", { size: 26, font: "b", color: "#FFFFFF" }));
+  inner.appendChild(icon(c.icon || GLYPH_ICON[c.glyph] || "check", 30, "#FFFFFF", 2.25));
   badge.appendChild(inner);
   card.appendChild(badge);
   const sp = box("Gap", "VERTICAL", { h: 8 });
@@ -760,7 +971,8 @@ async function celebrationOverlay(f: FrameNode, c: any): Promise<void> {
   }
   if (c.milestone) {
     const pillBox = box("Milestone", "HORIZONTAL", { p: [6, 12, 6, 12], gap: 6, r: 999, fill: gold ? "#FFFBEB" : "#EEF7F2", align: "CENTER" });
-    pillBox.appendChild(text("🏆  " + c.milestone, { size: 13, font: "s", color: gold ? "#92400E" : "#087443" }));
+    pillBox.appendChild(icon("trophy", 14, gold ? "#92400E" : "#087443"));
+    pillBox.appendChild(text(c.milestone, { size: 13, font: "s", color: gold ? "#92400E" : "#087443" }));
     card.appendChild(pillBox);
   }
   const gap2 = box("Gap", "VERTICAL", { h: 12 });
@@ -801,24 +1013,31 @@ async function drawMobileScreen(app: any, s: any): Promise<FrameNode> {
   // status bar
   const sb = add(f, box("Status bar", "HORIZONTAL", { h: 44, p: [0, 24, 0, 28], justify: "SPACE_BETWEEN", align: "CENTER" }), true);
   sb.appendChild(text("9:41", { size: 15, font: "s" }));
-  sb.appendChild(text("●●●  ▮", { size: 11, font: "s" }));
+  const sig = box("Signal", "HORIZONTAL", { gap: 6, align: "CENTER" });
+  sig.appendChild(icon("signal", 16, T.ink));
+  sig.appendChild(icon("battery", 22, T.ink));
+  sb.appendChild(sig);
   const nav = (s.blocks || []).find((b: any) => b.t === "nav");
-  if (nav && (nav.sub || nav.close || s.theme === "cargo")) {
+  if (nav && nav.flat) {
+    const h = add(f, box("Header / " + nav.title, "HORIZONTAL", { h: 52, p: [0, 16, 0, 16], align: "CENTER", gap: 16, fill: "#F1F2F4" }), true);
+    h.appendChild(icon("arrow-left", 22, T.ink));
+    h.appendChild(text(nav.title, { size: 16, font: "s" }));
+  } else if (nav && (nav.sub || nav.close || s.theme === "cargo")) {
     const h = add(f, box("Header / " + nav.title, "HORIZONTAL", { p: [12, 20, 14, 20], align: "CENTER", gap: 14, fill: "#FFFFFF" }), true);
     h.strokes = [solid(T.line)];
     h.strokeTopWeight = 0;
     h.strokeLeftWeight = 0;
     h.strokeRightWeight = 0;
     h.strokeBottomWeight = 1;
-    if (!nav.close) h.appendChild(text("←", { size: 22, color: T.ink }));
+    if (!nav.close) h.appendChild(icon("arrow-left", 22, T.ink));
     const col = add(h, box("Title", "VERTICAL", { gap: 3 }));
     col.layoutGrow = 1;
     add(col, text(nav.title, { size: 20, font: "b" }), true);
     if (nav.sub) add(col, text(nav.sub, { size: 13, color: T.muted }), true);
-    if (nav.close) h.appendChild(text("✕", { size: 18, color: T.ink }));
+    if (nav.close) h.appendChild(icon("x", 20, T.ink));
   } else if (nav) {
     const h = add(f, box("Header / " + nav.title, "HORIZONTAL", { h: 48, p: [0, 16, 0, 16], align: "CENTER", gap: 8 }), true);
-    h.appendChild(text("‹", { size: 26, color: T.ink }));
+    h.appendChild(icon("chevron-left", 24, T.ink));
     const t = add(h, text(nav.title, { size: 14, font: "s", align: "CENTER" }));
     t.layoutGrow = 1;
     h.appendChild(text(" ", { size: 26 }));
@@ -848,7 +1067,8 @@ async function drawMobileScreen(app: any, s: any): Promise<FrameNode> {
       const on = tab === s.tab;
       const item = box("Tab / " + tab, "VERTICAL", { gap: 4, align: "CENTER", w: 80 });
       const icon = box("Icon", "HORIZONTAL", { w: 46, h: 28, r: 12, fill: on ? T.mint : null, align: "CENTER", justify: "CENTER" });
-      icon.appendChild(circle(14, "none", on ? T.green : T.muted));
+      const tabIcons: Record<string, string> = { Home: "home", Orders: "package", Payments: "card", Account: "user", Deliveries: "car", Earnings: "wallet" };
+      icon.appendChild(iconNode(tabIcons[tab] || "dot", 20, on ? T.green : T.muted));
       item.appendChild(icon);
       item.appendChild(text(tab, { size: 10, font: "s", color: on ? T.green : T.muted }));
       bar.appendChild(item);
@@ -888,18 +1108,22 @@ const ATONES: Record<string, [string, string, string]> = {
   amber: ["#FFFBEB", "#B45309", "#FDE68A"],
   red: ["#FEF2F2", "#B91C1C", "#FECACA"],
   blue: ["#EFF6FF", "#1D4ED8", "#BFDBFE"],
-  neutral: ["#F4F4F5", "#3F3F46", "#E4E4E7"],
+  neutral: ["#FAFBFA", "#6B7280", "#E5E7EB"],
 };
+const TONE_KEYS: [string, string][] = [
+  ["green", "active online available paid approved completed delivered matched accepted remitted"],
+  ["red", "failed rejected suspended cancelled inactive amount_mismatch unexpected declined missed due"],
+  ["amber", "pending requested searching awaiting_approval processing unknown in_review scheduled returning offered unverified not_submitted"],
+  ["blue", "on_trip assigned to_pickup at_pickup loading in_transit at_destination offloading"],
+];
 function adminTone(v: string): string {
-  const s = v.toLowerCase();
-  if (/(transit|pickup|loading|offloading|destination|assigned|on trip|on a trip)/.test(s)) return "blue";
-  if (/(offline|not assigned|withdrawn|released|no longer|fixed)/.test(s)) return "neutral";
-  return statusTone(v);
+  const k = v.toLowerCase().replace(/[^a-z]+/g, "_").replace(/^_|_$/g, "");
+  return (TONE_KEYS.find(([, l]) => l.split(" ").indexOf(k) >= 0) || ["neutral"])[0];
 }
 function dotPill(label: string): FrameNode {
   const [bg, fg, bd] = ATONES[adminTone(label)] || ATONES.green;
   const p = box("Status / " + label, "HORIZONTAL", { p: [2, 8, 2, 7], gap: 5, r: 999, fill: bg, stroke: bd, align: "CENTER" });
-  p.appendChild(circle(6, fg));
+  if (!/^UGX /.test(label)) p.appendChild(circle(6, fg));
   p.appendChild(text(label, { size: 12, font: "m", color: fg }));
   return p;
 }
@@ -907,6 +1131,12 @@ function dotPill(label: string): FrameNode {
 function statusCell(v: string): SceneNode {
   if (v.startsWith("◉")) return dotPill(v.slice(1));
   if (v.startsWith("→")) return text(v.slice(1), { size: 13, font: "m", color: Z.ink });
+  if (/ ★$/.test(v)) {
+    const r = box("Rating", "HORIZONTAL", { gap: 4, align: "CENTER" });
+    r.appendChild(text(v.slice(0, -2), { size: 13, color: Z.text }));
+    r.appendChild(icon("star", 12, "#E2A400", 1.5));
+    return r;
+  }
   if (v.includes("\n")) {
     const [a, b2] = v.split("\n");
     const c = box("Two lines", "VERTICAL", { gap: 1 });
@@ -926,15 +1156,34 @@ function webButton(label: string, v = "outline", small = true): FrameNode {
   const primary = v === "default" || v === "primary";
   const danger = v === "danger";
   const b = box("Button / " + label, "HORIZONTAL", { h: small ? 32 : 36, p: [0, 12, 0, 12], r: 6, gap: 6, fill: primary ? T.primary : "#FFFFFF", stroke: primary ? undefined : Z.line, align: "CENTER", justify: "CENTER" });
-  b.appendChild(text(label, { size: 13, font: "m", color: primary ? "#FFFFFF" : danger ? "#B91C1C" : Z.ink }));
+  const color = primary ? "#FFFFFF" : danger ? "#B91C1C" : Z.ink;
+  let t = label;
+  if (t.startsWith("+  ")) {
+    b.appendChild(icon("plus", 14, color));
+    t = t.slice(3);
+  }
+  const caret = t.endsWith("  ▾");
+  b.appendChild(text(caret ? t.slice(0, -3) : t, { size: 13, font: "m", color }));
+  if (caret) b.appendChild(icon("chevron-down", 14, Z.mute));
   return b;
+}
+/** Card header with a divider under it (CardHeader + border-b). */
+function panelHead(c: FrameNode, title: string, right = "", ic = ""): FrameNode {
+  const hd = add(c, box("Head", "HORIZONTAL", { justify: "SPACE_BETWEEN", align: "CENTER", p: [0, 0, 10, 0] }), true);
+  hd.strokes = [solid(Z.line)];
+  hd.strokeBottomWeight = 1;
+  hd.strokeTopWeight = hd.strokeLeftWeight = hd.strokeRightWeight = 0;
+  hd.appendChild(text(title, { size: 14, font: "s", color: Z.ink }));
+  if (right) hd.appendChild(text(right, { size: 12, color: Z.mute }));
+  if (ic) hd.appendChild(icon(ic, 15, Z.mute));
+  return hd;
 }
 function panel(name: string, gap = 10): FrameNode {
   return box(name, "VERTICAL", { p: [12, 14, 12, 14], gap, r: 8, fill: "#FFFFFF", stroke: Z.line });
 }
 function searchBox(ph: string, w = 380): FrameNode {
   const s = box("Search", "HORIZONTAL", { w, h: 32, p: [0, 10, 0, 10], r: 6, fill: "#FFFFFF", stroke: Z.line, align: "CENTER", gap: 8 });
-  s.appendChild(text("⌕", { size: 13, color: Z.mute }));
+  s.appendChild(icon("search", 14, Z.mute));
   s.appendChild(text(ph, { size: 13, color: Z.faint }));
   return s;
 }
@@ -961,10 +1210,12 @@ async function adminBlock(parent: FrameNode, b: any, width: number): Promise<voi
         c.layoutGrow = 1;
         const top = add(c, box("Top", "HORIZONTAL", { justify: "SPACE_BETWEEN", align: "CENTER" }), true);
         top.appendChild(text(k.charAt(0) + k.slice(1).toLowerCase(), { size: 12, font: "m", color: Z.mute }));
-        const ic = box("Icon", "HORIZONTAL", { w: 22, h: 22, r: 6, fill: Z.soft, align: "CENTER", justify: "CENTER" });
-        ic.appendChild(text("◇", { size: 11, color: Z.mute }));
-        top.appendChild(ic);
-        add(c, text(v, { size: 20, font: "s", color: Z.ink, ls: -1 }), true);
+        const statIcons: [RegExp, string][] = [[/cancel/i, "x"], [/complet/i, "check"], [/progress|active|live/i, "activity"], [/trip|move|deliver/i, "package"], [/driver|online|offline|available/i, "truck"], [/customer|registered/i, "users"], [/collect|refund|spent|payment|balance|earning|platform|settlement|value|payout/i, "wallet"], [/issue|case/i, "help-circle"]];
+        const si = statIcons.find(([re]) => re.test(k))?.[1] || "activity";
+        top.appendChild(icon(si, 16, si === "package" ? T.primary : Z.mute));
+        c.paddingTop = c.paddingBottom = 16;
+        c.itemSpacing = 8;
+        add(c, text(v, { size: 22, font: "s", color: Z.ink, ls: -1 }), true);
         if (sub) add(c, text(sub, { size: 11, color: Z.faint }), true);
         if (link) add(c, text(link + " ↗", { size: 12, font: "m", color: T.primary }), true);
       }
@@ -972,30 +1223,63 @@ async function adminBlock(parent: FrameNode, b: any, width: number): Promise<voi
     }
     case "chart": {
       const c = add(parent, panel("Chart / " + b.title), true);
-      const hd = add(c, box("Head", "HORIZONTAL", { justify: "SPACE_BETWEEN" }), true);
-      hd.appendChild(text(b.title, { size: 14, font: "s", color: Z.ink }));
-      hd.appendChild(text(b.range || "Last 7 days", { size: 12, color: Z.mute }));
-      const bars = add(c, box("Bars", "HORIZONTAL", { h: 120, gap: 14, align: "MAX" }), true);
-      [60, 72, 66, 84, 92, 54, 104].forEach((h, i) => {
-        const r = figma.createRectangle();
-        r.resize(40, h);
-        r.cornerRadius = 4;
-        r.fills = [solid(i === 6 ? T.primary : "#D4D4D8")];
-        bars.appendChild(r);
+      panelHead(c, b.title, b.range || "Last 7 days");
+      const cw = width - 28 - 30;
+      const ch = 150;
+      const plot = add(c, box("Plot", "HORIZONTAL", { h: ch + 22, gap: 6 }), true);
+      const ax = add(plot, box("Y axis", "VERTICAL", { w: 24, h: ch, justify: "SPACE_BETWEEN" }));
+      for (const n of ["16", "12", "8", "4", "0"]) ax.appendChild(text(n, { size: 10, color: Z.mute }));
+      const area = figma.createFrame();
+      area.name = "Area";
+      area.fills = [];
+      area.resize(cw, ch + 22);
+      plot.appendChild(area);
+      for (let i = 0; i < 5; i++) {
+        const g = figma.createRectangle();
+        g.resize(cw, 1);
+        g.y = 6 + (i * (ch - 12)) / 4;
+        g.fills = [solid(Z.soft)];
+        area.appendChild(g);
+      }
+      const vals = b.values || [9, 6, 11, 8, 13, 10, 14];
+      const pts = vals.map((v: number, i: number) => [(i * cw) / (vals.length - 1), 6 + (ch - 12) * (1 - v / 16)]);
+      const line = "M " + pts.map((q: number[]) => q[0].toFixed(1) + " " + q[1].toFixed(1)).join(" L ");
+      const fillV = figma.createVector();
+      area.appendChild(fillV);
+      fillV.vectorPaths = [{ windingRule: "NONZERO", data: `${line} L ${cw} ${ch - 6} L 0 ${ch - 6} Z` }];
+      fillV.fills = [{ type: "GRADIENT_LINEAR", gradientTransform: [[0, 1, 0], [-1, 0, 1]], gradientStops: [{ position: 0, color: { ...rgb(T.primary), a: 0.25 } }, { position: 1, color: { ...rgb(T.primary), a: 0.02 } }] }];
+      fillV.strokes = [];
+      const lineV = figma.createVector();
+      area.appendChild(lineV);
+      lineV.vectorPaths = [{ windingRule: "NONE", data: line }];
+      lineV.strokes = [solid(T.primary)];
+      lineV.strokeWeight = 2;
+      lineV.fills = [];
+      for (const v of [fillV, lineV]) {
+        v.x = 0;
+        v.y = Math.min(...pts.map((q: number[]) => q[1]));
+      }
+      (b.days || ["Fri", "Sat", "Sun", "Mon", "Tue", "Wed", "Thu"]).forEach((d: string, i: number) => {
+        const t = text(d, { size: 10, color: Z.mute });
+        area.appendChild(t);
+        t.x = Math.min(cw - 20, Math.max(0, pts[i][0] - 8));
+        t.y = ch + 6;
       });
       return;
     }
     case "glance": {
-      const c = add(parent, panel("At a glance"), true);
-      c.appendChild(text(b.title || "Needs attention", { size: 14, font: "s", color: Z.ink }));
-      for (const [k, v] of b.items) {
-        const r = add(c, box("Row / " + k, "HORIZONTAL", { justify: "SPACE_BETWEEN", align: "CENTER", p: [6, 0, 6, 0] }), true);
-        const l = box("Label", "HORIZONTAL", { gap: 8, align: "CENTER" });
-        l.appendChild(circle(7, T.primary));
-        l.appendChild(text(k, { size: 13, color: Z.text }));
-        r.appendChild(l);
+      const c = add(parent, panel("At a glance", 0), true);
+      panelHead(c, b.title || "Needs attention", "", "activity");
+      b.items.forEach(([k, v]: any[], i: number) => {
+        const r = add(c, box("Row / " + k, "HORIZONTAL", { justify: "SPACE_BETWEEN", align: "CENTER", p: [10, 0, 10, 0] }), true);
+        if (i) {
+          r.strokes = [solid(Z.line)];
+          r.strokeTopWeight = 1;
+          r.strokeBottomWeight = r.strokeLeftWeight = r.strokeRightWeight = 0;
+        }
+        r.appendChild(text(k, { size: 13, color: Z.text }));
         r.appendChild(text(String(v), { size: 13, font: "s", color: Z.ink }));
-      }
+      });
       return;
     }
     case "split": {
@@ -1021,12 +1305,12 @@ async function adminBlock(parent: FrameNode, b: any, width: number): Promise<voi
         const tb = add(parent, box("Toolbar", "HORIZONTAL", { gap: 8, align: "CENTER" }), true);
         tb.appendChild(searchBox(b.search || "Search records…"));
         for (const fl of b.filters || []) tb.appendChild(webButton(fl + "  ▾"));
-        const sp = add(tb, box("Spacer", "HORIZONTAL", {}));
+        const sp = add(tb, box("Spacer", "HORIZONTAL", { w: 1, h: 1 }));
         sp.layoutGrow = 1;
         if (b.add) tb.appendChild(webButton("+  " + b.add, "default"));
-        for (const ic of ["⤓", "▥"]) {
+        for (const ic of ["download", "columns"]) {
           const k = box("Tool", "HORIZONTAL", { w: 32, h: 32, r: 6, fill: "#FFFFFF", stroke: Z.line, align: "CENTER", justify: "CENTER" });
-          k.appendChild(text(ic, { size: 13, color: Z.text }));
+          k.appendChild(icon(ic, 15, Z.text));
           tb.appendChild(k);
         }
       }
@@ -1053,14 +1337,19 @@ async function adminBlock(parent: FrameNode, b: any, width: number): Promise<voi
           cell.appendChild(statusCell(String(v)));
           r.appendChild(cell);
         });
-        if (open) r.appendChild(text("›", { size: 15, color: Z.faint }));
+        if (open) r.appendChild(icon("chevron-right", 15, Z.faint));
       }
       if (b.title) {
         const pg = add(parent, box("Pagination", "HORIZONTAL", { justify: "SPACE_BETWEEN", align: "CENTER" }), true);
         pg.appendChild(text(b.pager || `1–${b.rows.length} of ${b.rows.length} records`, { size: 12, color: Z.mute }));
         const rt = box("Pager", "HORIZONTAL", { gap: 8, align: "CENTER" });
         rt.appendChild(webButton("10 per page  ▾"));
-        rt.appendChild(text("‹   Page 1 of " + (b.pages || 1) + "   ›", { size: 12, color: Z.text }));
+        rt.appendChild(text("Page 1 of " + (b.pages || 1), { size: 12, color: Z.text }));
+        for (const n of ["chevron-left", "chevron-right"]) {
+          const k = box("Page " + n, "HORIZONTAL", { w: 32, h: 32, r: 6, fill: "#FFFFFF", stroke: Z.line, align: "CENTER", justify: "CENTER" });
+          k.appendChild(icon(n, 15, n === "chevron-left" ? Z.faint : Z.ink));
+          rt.appendChild(k);
+        }
         pg.appendChild(rt);
       }
       return;
@@ -1116,7 +1405,12 @@ async function adminBlock(parent: FrameNode, b: any, width: number): Promise<voi
     }
     case "actions": {
       const r = add(parent, box("Account actions", "HORIZONTAL", { gap: 6, align: "CENTER" }), true);
-      for (const label of b.items) r.appendChild(webButton(label, /^Approve/.test(label) ? "default" : "outline"));
+      for (const label of b.items) {
+        const bt = webButton(label, /^Approve/.test(label) ? "default" : "outline");
+        r.appendChild(bt);
+        const ai = /^Edit/.test(label) ? "pencil" : /^Message|^Contact|^Send/.test(label) ? "message" : /^Approve/.test(label) ? "check" : "";
+        if (ai) bt.insertChild(0, icon(ai, 14, /^Approve/.test(label) ? "#FFFFFF" : Z.ink));
+      }
       if (b.more) r.appendChild(webButton("More  ▾"));
       if (b.menu) {
         const m = add(parent, box("More menu (open)", "VERTICAL", { w: 230, p: 4, r: 8, fill: "#FFFFFF", stroke: Z.line }));
@@ -1140,9 +1434,16 @@ async function adminBlock(parent: FrameNode, b: any, width: number): Promise<voi
       for (const [label, title, sub, link] of b.items) {
         const c = add(r, panel("Card / " + label, 3));
         c.layoutGrow = 1;
-        add(c, text(label, { size: 11, font: "m", color: Z.mute }), true);
-        add(c, text(title, { size: 13, font: "s", color: Z.ink }), true);
-        if (sub) add(c, text(sub, { size: 12, color: Z.mute }), true);
+        add(c, text(label.toUpperCase(), { size: 11, font: "m", color: Z.mute, ls: 6 }), true);
+        const who = add(c, box("Who", "HORIZONTAL", { gap: 10, align: "CENTER" }), true);
+        if (!/^UGX|^LM-|payment/i.test(title + label)) {
+          const av = box("Avatar", "HORIZONTAL", { w: 32, h: 32, r: 16, fill: Z.soft, align: "CENTER", justify: "CENTER" });
+          av.appendChild(text(title.split(/\s+/).map((w: string) => w[0]).join("").slice(0, 2).toUpperCase(), { size: 11, font: "s", color: Z.text }));
+          who.appendChild(av);
+        }
+        const wc = add(who, box("Text", "VERTICAL", { gap: 2 }));
+        wc.appendChild(statusCell(title.startsWith("◉") ? title : "→" + title));
+        if (sub) wc.appendChild(sub.startsWith("◉") ? dotPill(sub.slice(1)) : text(sub, { size: 12, color: Z.mute }));
         if (link) add(c, text(link + " →", { size: 12, font: "m", color: T.primary }), true);
       }
       return;
@@ -1228,7 +1529,7 @@ async function adminBlock(parent: FrameNode, b: any, width: number): Promise<voi
           col.appendChild(text(name, { size: 13, font: "m", color: Z.ink }));
           col.appendChild(text(sub, { size: 11, color: Z.mute }));
           row.appendChild(col);
-          row.appendChild(text("›", { size: 15, color: Z.faint }));
+          row.appendChild(icon("chevron-right", 15, Z.faint));
         }
       add(parent, text("Simulated positions · trip stage for drivers on a trip, last drop-off otherwise · not live GPS · refreshed every 4 s", { size: 11, color: Z.mute }), true);
       return;
@@ -1261,7 +1562,7 @@ async function adminBlock(parent: FrameNode, b: any, width: number): Promise<voi
             const on = opt.startsWith("✓");
             const it = box("Check / " + opt, "HORIZONTAL", { w: 230, gap: 8, align: "CENTER" });
             const bx = box("Box", "HORIZONTAL", { w: 16, h: 16, r: 4, fill: on ? T.primary : "#FFFFFF", stroke: on ? T.primary : Z.line, align: "CENTER", justify: "CENTER" });
-            if (on) bx.appendChild(text("✓", { size: 10, font: "b", color: "#FFFFFF" }));
+            if (on) bx.appendChild(icon("check", 12, "#FFFFFF", 3));
             it.appendChild(bx);
             it.appendChild(text(opt.replace(/^✓/, ""), { size: 12, color: Z.text }));
             g.appendChild(it);
@@ -1310,6 +1611,72 @@ async function adminBlock(parent: FrameNode, b: any, width: number): Promise<voi
       for (const [i, l] of b.lines.entries()) add(n, text(l, { size: 12, font: i ? "r" : "s", color: i ? Z.text : Z.ink }), true);
       return;
     }
+    case "profile": {
+      // Profile edit card (ProfileEditCard in apps/admin/src/App.tsx).
+      const c = add(parent, box("Profile edit card", "VERTICAL", { p: 20, gap: 20, r: 8, fill: "#FFFFFF", stroke: Z.line }), true);
+      const hd = add(c, box("Head", "HORIZONTAL", { justify: "SPACE_BETWEEN", align: "CENTER" }), true);
+      const id = box("Identity", "VERTICAL", { gap: 2 });
+      id.appendChild(text(b.meta, { size: 12, color: Z.mute }));
+      id.appendChild(text(b.name, { size: 20, font: "s", color: Z.ink }));
+      id.appendChild(text(b.email, { size: 13, color: Z.mute }));
+      hd.appendChild(id);
+      const bd = box("Badges", "HORIZONTAL", { gap: 6, align: "CENTER" });
+      for (const x of b.badges || []) bd.appendChild(dotPill(x));
+      hd.appendChild(bd);
+      const hr = figma.createRectangle();
+      hr.resize(100, 1);
+      hr.fills = [solid(Z.line)];
+      add(c, hr, true);
+      const fields = add(c, box("Fields", "HORIZONTAL", { gap: 28, align: "MIN" }), true);
+      const ph = add(fields, box("Profile photo", "HORIZONTAL", { w: 320, gap: 14, align: "CENTER" }));
+      const av = box("Avatar", "HORIZONTAL", { w: 72, h: 72, r: 36, fill: b.photo ? "#B7E4C7" : Z.soft, stroke: Z.line, align: "CENTER", justify: "CENTER" });
+      av.appendChild(b.photo ? icon("user", 34, "#087443", 1.75) : text(b.initials, { size: 22, font: "s", color: "#52525B" }));
+      ph.appendChild(av);
+      const pc = box("Upload", "VERTICAL", { gap: 5 });
+      pc.appendChild(text("Profile photo", { size: 13, font: "m", color: Z.ink }));
+      const pb = box("Buttons", "HORIZONTAL", { gap: 6, align: "CENTER" });
+      pb.appendChild(webButton(b.photo ? "Replace photo" : "Upload photo", "outline", false));
+      if (b.photo) pb.appendChild(text("Remove", { size: 13, font: "m", color: Z.ink }));
+      pc.appendChild(pb);
+      pc.appendChild(text("JPG or PNG · Up to 5 MB", { size: 12, color: Z.mute }));
+      ph.appendChild(pc);
+      for (const [label, value, help, placeholder] of b.fields) {
+        const f = add(fields, box("Field / " + label, "VERTICAL", { gap: 6 }));
+        f.layoutGrow = 1;
+        add(f, text(label, { size: 13, font: "m", color: Z.ink }), true);
+        const i = add(f, box("Input", "HORIZONTAL", { h: 40, p: [0, 10, 0, 10], r: 6, fill: "#FFFFFF", stroke: Z.line, align: "CENTER" }), true);
+        i.appendChild(text(value || placeholder || " ", { size: 13, color: value ? Z.ink : Z.mute }));
+        add(f, text(help, { size: 12, color: Z.mute }), true);
+      }
+      const ft = add(c, box("Foot", "HORIZONTAL", { justify: "SPACE_BETWEEN", align: "CENTER" }), true);
+      ft.appendChild(text(b.foot, { size: 12, color: Z.mute }));
+      const save = webButton("Save changes", "default", false);
+      if (!b.dirty) save.opacity = 0.5;
+      ft.appendChild(save);
+      return;
+    }
+    case "device": {
+      // App & device section (DeviceCard in apps/admin/src/App.tsx).
+      const c = add(parent, box("App & device", "VERTICAL", { p: [16, 20, 16, 20], gap: 6, r: 8, fill: "#FFFFFF", stroke: Z.line }), true);
+      const hd = add(c, box("Head", "HORIZONTAL", { gap: 8, align: "CENTER" }), true);
+      hd.appendChild(icon("phone", 15, Z.ink));
+      hd.appendChild(text("App & device", { size: 14, font: "s", color: Z.ink }));
+      add(c, text(b.sub, { size: 12, color: Z.mute }), true);
+      if (!b.rows) {
+        add(c, text("No device reported yet. It appears after this account next opens the mobile app.", { size: 12, color: Z.mute }), true);
+        return;
+      }
+      await adminBlock(c, { t: "detail", cols: 5, rows: b.rows }, width - 40);
+      if (b.earlier?.length) {
+        add(c, text("Earlier devices", { size: 11, font: "m", color: Z.mute }), true);
+        for (const [t1, t2] of b.earlier) {
+          const r = add(c, box("Earlier device", "VERTICAL", { gap: 1 }), true);
+          r.appendChild(text(t1, { size: 13, font: "m", color: Z.ink }));
+          r.appendChild(text(t2, { size: 12, color: Z.mute }));
+        }
+      }
+      return;
+    }
     default:
       add(parent, text(`[${b.t}]`, { size: 12, color: Z.mute }), true);
   }
@@ -1324,7 +1691,7 @@ function sidebar(app: any, active: string): FrameNode {
   s.strokeRightWeight = 1;
   const brand = add(s, box("Brand", "HORIZONTAL", { gap: 8, p: [6, 8, 4, 8], align: "CENTER" }), true);
   const mark = box("Logo", "HORIZONTAL", { w: 24, h: 24, r: 6, fill: T.primary, align: "CENTER", justify: "CENTER" });
-  mark.appendChild(text("↗", { size: 13, font: "b", color: "#FFFFFF" }));
+  mark.appendChild(icon("arrow-up-right", 15, "#FFFFFF", 2.5));
   brand.appendChild(mark);
   brand.appendChild(text("LoadMaster", { size: 15, font: "s", color: Z.ink }));
   const org = add(s, box("Workspace", "HORIZONTAL", { p: [6, 8, 6, 8], gap: 8, r: 6, fill: "#FFFFFF", stroke: Z.line, align: "CENTER" }), true);
@@ -1333,7 +1700,7 @@ function sidebar(app: any, active: string): FrameNode {
   org.appendChild(av);
   const oc = box("Org", "VERTICAL", { gap: 1 });
   oc.appendChild(text("Cargo operations", { size: 12, font: "m", color: Z.ink }));
-  oc.appendChild(text("Kampala · V2 demo", { size: 10, color: Z.mute }));
+  oc.appendChild(text("KAMPALA · V2 DEMO", { size: 10, color: Z.mute, ls: 4 }));
   org.appendChild(oc);
   for (const [label, items] of app.nav || []) {
     const g = add(s, box("Group / " + label, "VERTICAL", { gap: 1 }), true);
@@ -1341,10 +1708,22 @@ function sidebar(app: any, active: string): FrameNode {
     for (const [path, name] of items) {
       const on = path === active;
       const it = add(g, box("Nav / " + name, "HORIZONTAL", { p: [6, 8, 6, 8], gap: 8, r: 6, fill: on ? "#FFFFFF" : null, stroke: on ? Z.line : undefined, align: "CENTER" }), true);
-      it.appendChild(text("▢", { size: 12, color: on ? T.primary : Z.mute }));
+      const navIcons: Record<string, string> = { dashboard: "dashboard", trips: "package", drivers: "truck", customers: "users", payments: "wallet-cards", payouts: "wallet", transfers: "transfer", reconciliation: "clipboard-check", methods: "wallet-cards", rewards: "gift", support: "help-circle", staff: "shield", audit: "file-text", reports: "chart", settings: "gear" };
+      it.appendChild(icon(navIcons[path] || "dot", 15, on ? T.primary : Z.mute));
       it.appendChild(text(name, { size: 13, font: on ? "m" : "r", color: on ? Z.ink : Z.text }));
     }
   }
+  const ft = add(s, box("Footer", "VERTICAL", { gap: 4, p: [10, 8, 4, 8] }), true);
+  ft.strokes = [solid(Z.line)];
+  ft.strokeTopWeight = 1;
+  ft.strokeBottomWeight = ft.strokeLeftWeight = ft.strokeRightWeight = 0;
+  const sv = add(ft, box("Service", "HORIZONTAL", { gap: 6, align: "CENTER" }));
+  sv.appendChild(circle(6, T.primary));
+  sv.appendChild(text("Shared demo service", { size: 12, font: "m", color: Z.ink }));
+  ft.appendChild(text("Customer · Driver · Operations", { size: 11, color: Z.mute }));
+  const so = add(ft, box("Sign out", "HORIZONTAL", { gap: 8, p: [8, 0, 0, 0], align: "CENTER" }));
+  so.appendChild(icon("log-out", 15, Z.mute));
+  so.appendChild(text("Sign out", { size: 13, color: Z.text }));
   return s;
 }
 function topbar(app: any, route: string): FrameNode {
@@ -1358,7 +1737,7 @@ function topbar(app: any, route: string): FrameNode {
   t.strokeBottomWeight = 1;
   const crumb = box("Breadcrumb", "HORIZONTAL", { gap: 6, align: "CENTER" });
   crumb.appendChild(text(group ? group[0] : "", { size: 13, color: Z.mute }));
-  crumb.appendChild(text("›", { size: 13, color: Z.mute }));
+  crumb.appendChild(icon("chevron-right", 14, Z.mute));
   crumb.appendChild(text(name, { size: 13, font: "m", color: Z.ink }));
   t.appendChild(crumb);
   const right = box("Right", "HORIZONTAL", { gap: 10, align: "CENTER" });
@@ -1385,7 +1764,7 @@ async function adminScreen(app: any, s: any): Promise<FrameNode> {
     art.strokeRightWeight = 1;
     const brand = box("Brand", "HORIZONTAL", { gap: 8, align: "CENTER" });
     const mark = box("Logo", "HORIZONTAL", { w: 24, h: 24, r: 6, fill: T.primary, align: "CENTER", justify: "CENTER" });
-    mark.appendChild(text("↗", { size: 13, font: "b", color: "#FFFFFF" }));
+    mark.appendChild(icon("arrow-up-right", 15, "#FFFFFF", 2.5));
     brand.appendChild(mark);
     brand.appendChild(text("LoadMaster", { size: 15, font: "s", color: Z.ink }));
     art.appendChild(brand);
@@ -1411,7 +1790,11 @@ async function adminScreen(app: any, s: any): Promise<FrameNode> {
   add(shell, topbar(app, route), true);
   const main = add(shell, box("Main", "VERTICAL", { p: [16, 20, 32, 20], gap: 12 }), true);
   if (s.page) {
-    if (s.page.back) add(main, text("← Back", { size: 12, color: Z.mute }), true);
+    if (s.page.back) {
+      const back = add(main, box("Back", "HORIZONTAL", { gap: 4, align: "CENTER" }));
+      back.appendChild(icon("arrow-left", 13, Z.mute));
+      back.appendChild(text("Back", { size: 12, color: Z.mute }));
+    }
     const hd = add(main, box("Page header", "HORIZONTAL", { justify: "SPACE_BETWEEN", align: "MAX", gap: 12 }), true);
     const col = add(hd, box("Title", "VERTICAL", { gap: 2 }));
     if (s.page.meta) col.appendChild(text(s.page.meta, { size: 12, color: Z.mute }));
@@ -1473,7 +1856,10 @@ function annotation(appId: string, s: any, idx: string): FrameNode {
       for (const h of ac.affects || []) {
         const r = add(c, box("Affects", "HORIZONTAL", { gap: 8, p: [6, 8, 6, 8], r: 8, fill: "#FFFFFF", stroke: APP_COLOR[h.app] }), true);
         const chip = box("App", "HORIZONTAL", { p: [2, 6, 2, 6], r: 999, fill: APP_COLOR[h.app] });
-        chip.appendChild(text("→ " + APP_NAME[h.app], { size: 10, font: "s", color: "#FFFFFF" }));
+        chip.itemSpacing = 3;
+        chip.counterAxisAlignItems = "CENTER";
+        chip.appendChild(icon("arrow-right", 10, "#FFFFFF", 2.5));
+        chip.appendChild(text(APP_NAME[h.app], { size: 10, font: "s", color: "#FFFFFF" }));
         r.appendChild(chip);
         const t = add(r, text(`${h.screen} · ${h.what}`, { size: 11, color: "#344054", lh: 135 }));
         t.layoutGrow = 1;
@@ -1540,6 +1926,186 @@ function report(textValue: string): void {
 }
 const tick = () => new Promise<void>((r) => setTimeout(r, 0));
 
+// ------------------------------------------------------- captured screens
+// Screens captured from the running apps (scripts/capture) are rebuilt layer by
+// layer from what the browser painted: exact boxes, colours, type and icons.
+let CAPTURES: any = {};
+const FONT_OK = new Map<string, FontName>();
+const WEIGHT: Record<number, string> = { 100: "Thin", 200: "Extra Light", 300: "Light", 400: "Regular", 500: "Medium", 600: "Semi Bold", 700: "Bold", 800: "Extra Bold", 900: "Black" };
+async function capFont(family: string, weight: number, italic: boolean): Promise<FontName> {
+  const style = (WEIGHT[Math.round(weight / 100) * 100] || "Regular") + (italic ? " Italic" : "");
+  const want = /inter/i.test(family) ? "Inter" : /^(-apple-system|system-ui|blinkmacsystemfont|sf pro)/i.test(family) ? "SF Pro" : family;
+  const key = want + "|" + style;
+  if (FONT_OK.has(key)) return FONT_OK.get(key)!;
+  for (const f of [{ family: want, style }, { family: "Inter", style }, { family: "Inter", style: "Regular" }]) {
+    try {
+      await figma.loadFontAsync(f);
+      FONT_OK.set(key, f);
+      return f;
+    } catch {
+      // Try the next fallback.
+    }
+  }
+  return F.r;
+}
+function cssColor(c: string): { color: RGB; a: number } | null {
+  const m = String(c || "").match(/rgba?\(([^)]+)\)/);
+  if (!m) return null;
+  const p = m[1].split(/[\s,/]+/).filter(Boolean).map(Number);
+  return { color: { r: p[0] / 255, g: p[1] / 255, b: p[2] / 255 }, a: p[3] ?? 1 };
+}
+function cssPaint(c: string): SolidPaint | null {
+  const x = cssColor(c);
+  return x && x.a > 0 ? { type: "SOLID", color: x.color, opacity: x.a } : null;
+}
+function cssGradient(g: string): GradientPaint | null {
+  const m = g.match(/linear-gradient\((.*)\)$/);
+  if (!m) return null;
+  const parts = m[1].split(/,(?![^(]*\))/).map((s) => s.trim());
+  let deg = 180;
+  if (/deg$/.test(parts[0])) deg = parseFloat(parts.shift()!);
+  else if (/^to /.test(parts[0])) {
+    const d = parts.shift()!;
+    deg = /right/.test(d) ? 90 : /left/.test(d) ? 270 : /top/.test(d) ? 0 : 180;
+  }
+  const stops = parts.map((s, i) => {
+    const col = cssColor(s);
+    const pos = s.match(/([\d.]+)%\s*$/);
+    return { position: pos ? parseFloat(pos[1]) / 100 : i / Math.max(1, parts.length - 1), color: { ...(col ? col.color : { r: 0, g: 0, b: 0 }), a: col ? col.a : 1 } };
+  });
+  const a = (deg * Math.PI) / 180;
+  const dx = Math.sin(a);
+  const dy = -Math.cos(a);
+  const L = Math.abs(dx) + Math.abs(dy);
+  return {
+    type: "GRADIENT_LINEAR",
+    gradientStops: stops,
+    gradientTransform: [
+      [dx / L, dy / L, 0.5 - (0.5 * dx + 0.5 * dy) / L],
+      [-dy / L, dx / L, 0.5 - (-0.5 * dy + 0.5 * dx) / L],
+    ],
+  };
+}
+function cssShadows(s: string): Effect[] {
+  const out: Effect[] = [];
+  s.split(/,(?![^(]*\))/).forEach((one) => {
+    const col = cssColor(one);
+    const nums = one.replace(/rgba?\([^)]*\)/, "").match(/-?[\d.]+px/g)?.map(parseFloat) || [];
+    if (!col || nums.length < 2 || col.a === 0) return;
+    out.push({ type: /inset/.test(one) ? "INNER_SHADOW" : "DROP_SHADOW", color: { ...col.color, a: col.a }, offset: { x: nums[0], y: nums[1] }, radius: nums[2] || 0, spread: nums[3] || 0, visible: true, blendMode: "NORMAL" });
+  });
+  return out;
+}
+function imagePaint(data: string, mode: "FILL" | "FIT"): ImagePaint | null {
+  const b64 = String(data || "").split(",")[1];
+  if (!b64) return null;
+  try {
+    return { type: "IMAGE", imageHash: figma.createImage(figma.base64Decode(b64)).hash, scaleMode: mode };
+  } catch {
+    return null;
+  }
+}
+async function capNode(n: any, parent: FrameNode, ox: number, oy: number): Promise<void> {
+  if (n.k === "text") {
+    const t = figma.createText();
+    const st = n.st;
+    t.fontName = await capFont(st.f, st.w, !!st.i);
+    t.characters = st.tt === "uppercase" ? n.t.toUpperCase() : st.tt === "lowercase" ? n.t.toLowerCase() : n.t;
+    t.fontSize = st.s;
+    const p = cssPaint(st.c);
+    t.fills = p ? [p] : [];
+    if (st.lh) t.lineHeight = { value: st.lh, unit: "PIXELS" };
+    if (st.ls) t.letterSpacing = { value: st.ls, unit: "PIXELS" };
+    if (st.td === "underline") t.textDecoration = "UNDERLINE";
+    if (st.td === "line-through") t.textDecoration = "STRIKETHROUGH";
+    const align = st.a === "center" ? "CENTER" : st.a === "right" || st.a === "end" ? "RIGHT" : "LEFT";
+    t.name = n.t.slice(0, 40);
+    parent.appendChild(t);
+    if (n.lines > 1) {
+      t.textAlignHorizontal = align;
+      t.resize(Math.ceil(n.w) + 1, Math.max(1, n.h));
+      t.textAutoResize = "HEIGHT";
+      t.x = n.x - ox;
+    } else {
+      t.textAutoResize = "WIDTH_AND_HEIGHT";
+      t.x = n.x - ox;
+    }
+    t.y = n.y - oy + (n.lines > 1 ? 0 : (n.h - t.height) / 2);
+    return;
+  }
+  if (n.k === "svg") {
+    try {
+      const v = figma.createNodeFromSvg(n.svg);
+      v.name = "Icon";
+      parent.appendChild(v);
+      v.x = n.x - ox;
+      v.y = n.y - oy;
+      if (n.o !== undefined && n.o < 1) v.opacity = n.o;
+    } catch {
+      // Unsupported SVG features: skip the icon rather than fail the screen.
+    }
+    return;
+  }
+  if (n.k === "img") {
+    const r = figma.createRectangle();
+    r.name = "Image";
+    r.resize(Math.max(1, n.w), Math.max(1, n.h));
+    const paint = imagePaint(n.data, n.fit === "contain" ? "FIT" : "FILL");
+    r.fills = paint ? [paint] : [solid("#E5E7EB")];
+    if (n.r) r.cornerRadius = n.r;
+    parent.appendChild(r);
+    r.x = n.x - ox;
+    r.y = n.y - oy;
+    return;
+  }
+  const f = figma.createFrame();
+  f.name = n.n && n.n !== "div" ? n.n : "Box";
+  f.resize(Math.max(0.01, n.w), Math.max(0.01, n.h));
+  const fills: Paint[] = [];
+  const bg = n.bg && cssPaint(n.bg);
+  if (bg) fills.push(bg);
+  const gr = n.grad && cssGradient(n.grad);
+  if (gr) fills.push(gr);
+  const im = n.bgImg && imagePaint(n.bgImg, /contain/.test(n.bgSize || "") ? "FIT" : "FILL");
+  if (im) fills.push(im);
+  f.fills = fills;
+  if (n.rad) {
+    f.topLeftRadius = n.rad[0];
+    f.topRightRadius = n.rad[1];
+    f.bottomRightRadius = n.rad[2];
+    f.bottomLeftRadius = n.rad[3];
+  }
+  if (n.bw) {
+    const sp = cssPaint(n.bc);
+    if (sp) {
+      f.strokes = [sp];
+      f.strokeAlign = "INSIDE";
+      f.strokeTopWeight = n.bw[0];
+      f.strokeRightWeight = n.bw[1];
+      f.strokeBottomWeight = n.bw[2];
+      f.strokeLeftWeight = n.bw[3];
+      if (n.dash) f.dashPattern = [4, 4];
+    }
+  }
+  if (n.sh) f.effects = cssShadows(n.sh);
+  if (n.o !== undefined) f.opacity = n.o;
+  f.clipsContent = !!n.clip;
+  parent.appendChild(f);
+  f.x = n.x - ox;
+  f.y = n.y - oy;
+  for (const k of n.kids || []) await capNode(k, f, n.x, n.y);
+}
+async function drawCapture(cap: any, name: string): Promise<FrameNode> {
+  const f = figma.createFrame();
+  f.name = name;
+  f.resize(cap.w, cap.h);
+  const bg = cssPaint(cap.bg);
+  f.fills = bg ? [bg] : [solid("#FFFFFF")];
+  f.clipsContent = true;
+  for (const k of cap.kids || []) await capNode(k, f, 0, 0);
+  return f;
+}
+
 async function buildApp(app: any, page: PageNode, notes: boolean, registry: Map<string, ComponentNode>): Promise<void> {
   await figma.setCurrentPageAsync(page);
   const board = own(box(app.name + " · handoff", "VERTICAL", { gap: 120, p: 120, fill: "#F2F4F7" }));
@@ -1566,7 +2132,8 @@ async function buildApp(app: any, page: PageNode, notes: boolean, registry: Map<
       label.appendChild(text(`${idx}  ${s.name}`, { size: 20, font: "s", color: "#101828" }));
       if (s.tag) label.appendChild(pill(s.tag.toUpperCase(), s.tag === "New" ? "blue" : "amber", true));
       const body = add(pair, box("Body", "HORIZONTAL", { gap: 32, align: "MIN" }));
-      const frame = app.platform === "mobile" ? await mobileScreen(app, s) : await adminScreen(app, s);
+      const cap = CAPTURES[s.id];
+      const frame = cap ? await drawCapture(cap, s.name) : app.platform === "mobile" ? await mobileScreen(app, s) : await adminScreen(app, s);
       body.appendChild(frame);
       const comp = figma.createComponentFromNode(frame);
       comp.name = `${app.name} / ${idx} ${s.name}`;
@@ -1630,12 +2197,14 @@ async function flowBoard(flow: any, registry: Map<string, ComponentNode>): Promi
   const cols = Math.max(...flow.steps.map((s: any) => s.col)) + 1;
   const rowsPer: Record<string, number> = {};
   for (const l of LANES) rowsPer[l] = Math.max(0, ...flow.steps.filter((s: any) => s.lane === l).map((s: any) => (s.row || 0) + 1));
-  const cardH = (st: any) => (st.screen ? 400 : 120);
+  // Journeys (flow.big) show each captured step large enough to read.
+  const shotH = flow.big ? 640 : 400;
+  const cardH = (st: any) => (st.screen ? shotH : 120);
   const laneH: Record<string, number> = {};
   for (const l of LANES) {
     const steps = flow.steps.filter((s: any) => s.lane === l);
     const rows = rowsPer[l];
-    const tallest = steps.some((s: any) => s.screen) ? 400 : 120;
+    const tallest = steps.some((s: any) => s.screen) ? shotH : 120;
     laneH[l] = rows ? rows * (tallest + 30) + 30 : 70;
   }
   const head = 170;
@@ -1686,11 +2255,17 @@ async function flowBoard(flow: any, registry: Map<string, ComponentNode>): Promi
     if (st.api) para(card, st.api, { size: 11, font: "m", color: "#1D4ED8" });
     if (st.screen) {
       const comp = await findScreen(st.screen, registry);
-      const holder = add(card, box("Screen thumbnail", "VERTICAL", { h: 290, r: 10, fill: "#F2F4F7", align: "CENTER", clip: true, p: [8, 0, 0, 0] }), true);
+      const room = flow.big ? 520 : 280;
+      const holder = add(card, box("Screen thumbnail", "VERTICAL", { h: room + 10, r: 10, fill: "#F2F4F7", align: "CENTER", clip: true, p: [8, 0, 0, 0] }), true);
+      const cap = CAPTURES[st.screen];
       if (comp) {
         const inst = comp.createInstance();
-        inst.rescale(Math.min((CARD_W - 28) / comp.width, 280 / comp.height));
+        inst.rescale(Math.min((CARD_W - 28) / comp.width, room / comp.height));
         holder.appendChild(inst);
+      } else if (cap) {
+        const shot = await drawCapture(cap, st.label);
+        shot.rescale(Math.min((CARD_W - 28) / cap.w, room / cap.h));
+        holder.appendChild(shot);
       } else
         para(holder, "Generate the " + APP_NAME[st.lane] + " page to show this screen.", { size: 11, color: "#667085", align: "CENTER" });
       para(card, st.screen, { size: 10, font: "m", color: "#667085" });
@@ -1778,7 +2353,7 @@ async function buildMachines(spec: any, page: PageNode): Promise<void> {
       r.strokeLeftWeight = 0;
       r.strokeRightWeight = 0;
       r.appendChild(pill(a, statusTone(a), true));
-      r.appendChild(text("→", { size: 16, font: "b", color: "#667085" }));
+      r.appendChild(icon("arrow-right", 16, "#667085"));
       r.appendChild(pill(b, statusTone(b), true));
       r.appendChild(text(why, { size: 13, color: "#344054" }));
     }
@@ -1926,6 +2501,8 @@ async function generate(msg: Extract<UiMessage, { type: "generate" }>): Promise<
     (parts.flows ? spec.flows.length : 0) +
     1;
   CARGO_T = spec.tokens.cargo || {};
+  ICON_PATHS = { ...ICON_PATHS, ...(spec.icons || {}) };
+  CAPTURES = spec.captures || {};
   const registry = new Map<string, ComponentNode>();
   const made: string[] = [];
   const start = figma.currentPage;

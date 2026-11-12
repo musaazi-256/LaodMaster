@@ -30,7 +30,8 @@
     "build:ios": "node scripts/build-native.mjs ios",
     "emulator": "node scripts/emulator.mjs",
     "test:ios": "node scripts/ios-smoke.mjs",
-    "handoff": "node scripts/handoff.mjs"
+    "handoff": "node scripts/handoff.mjs",
+    "capture": "node scripts/capture/all.mjs"
   },
   "devDependencies": {
     "@eslint/js": "^9.0.0",

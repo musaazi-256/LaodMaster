@@ -3,10 +3,11 @@
 //
 //   npm run handoff          validate + build
 //   node scripts/handoff.mjs --check   validate only
-import { readFileSync, writeFileSync } from "node:fs";
+import { existsSync, readdirSync, readFileSync, writeFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { deflateRawSync } from "node:zlib";
-import { spec as source } from "../design/handoff/spec.mjs";
+import ts from "typescript";
+import { spec as source, icons } from "../design/handoff/spec.mjs";
 
 const root = fileURLToPath(new URL("..", import.meta.url));
 const read = (p) => readFileSync(root + p, "utf8");
@@ -30,6 +31,7 @@ export function adminNav() {
 export function buildSpec() {
   const spec = structuredClone(source);
   spec.apps.find((a) => a.id === "admin").nav = adminNav();
+  spec.icons = icons;
   spec.generatedAt = new Date().toISOString();
   return spec;
 }
@@ -188,14 +190,38 @@ export function validate(spec = buildSpec()) {
   return problems;
 }
 
-// Drops indentation and full-line comments from the deployed bundle only; the
-// readable source stays in code.template.ts.
-const compact = (src) =>
-  src
-    .split("\n")
-    .map((l) => l.trim())
-    .filter((l) => l && !l.startsWith("//"))
-    .join("\n");
+// Re-emits the template token by token (via the TypeScript parser): comments and
+// spaces inside a line go, line breaks stay so semicolon insertion is unchanged.
+// The deployed file has a ~100 KB limit; the readable source is code.template.ts.
+const compact = (src) => {
+  const sf = ts.createSourceFile("code.ts", src, ts.ScriptTarget.Latest, true);
+  let out = "";
+  let prevEnd = 0;
+  const word = /[\w$]/;
+  const leaf = (node) => {
+    if (node.kind >= ts.SyntaxKind.FirstJSDocNode && node.kind <= ts.SyntaxKind.LastJSDocNode) return;
+    const kids = node.getChildren(sf);
+    if (kids.length && node.kind !== ts.SyntaxKind.JsxText) return kids.forEach(leaf);
+    const start = node.getStart(sf);
+    const tok = src.slice(start, node.end);
+    if (!tok) return;
+    const gap = src.slice(prevEnd, start);
+    const a = out.slice(-1);
+    const b = tok[0];
+    const nl = out && /\n/.test(gap.replace(/\/\*[\s\S]*?\*\/|\/\/[^\n]*/g, (c) => (c.includes("\n") ? "\n" : "")));
+    // A break after ; { } or , can never change how the code parses.
+    if (nl && !/[;{},]/.test(a)) out += "\n";
+    else if (nl && word.test(a) && word.test(b)) out += " ";
+    else if (word.test(a) && word.test(b)) out += " ";
+    else if ((a === "+" || a === "-") && a === b) out += " ";
+    out += tok;
+    prevEnd = node.end;
+  };
+  leaf(sf);
+  // Lint directives must survive: the Figma build runs eslint on the bundle.
+  const directives = src.match(/^\/\* eslint-disable[^\n]*\*\/$/gm) || [];
+  return [...directives, out.replace(/\n+/g, "\n")].join("\n");
+};
 
 export function build() {
   const spec = buildSpec();
@@ -206,8 +232,29 @@ export function build() {
     root + "design/handoff/loadmaster-handoff.json",
     JSON.stringify(spec, null, 2) + "\n",
   );
+  // Screens captured from the running apps (scripts/capture/run.mjs) ride along
+  // in a second file, so the plugin can rebuild them exactly.
+  const capDir = root + "design/handoff/captures/";
+  const ids = new Set(spec.apps.flatMap((a) => a.sections.flatMap((s) => s.screens.map((x) => x.id))));
+  const captures = {};
+  if (existsSync(capDir))
+    for (const f of readdirSync(capDir))
+      if (f.endsWith(".json") && (ids.has(f.slice(0, -5)) || /^(j|auto)-/.test(f))) captures[f.slice(0, -5)] = JSON.parse(read("design/handoff/captures/" + f));
+  // Documented journeys (scripts/capture/journeys.mjs) lead the flows page.
+  const journeys = existsSync(capDir + "journeys.json") ? Object.values(JSON.parse(read("design/handoff/captures/journeys.json"))) : [];
+  // Screens found in the code but missing from spec.mjs (scripts/capture/discover.mjs).
+  const found = existsSync(capDir + "auto.json") ? JSON.parse(read("design/handoff/captures/auto.json")).filter((x) => captures[x.id]) : [];
+  const apps = spec.apps.map((a) => {
+    const extra = found.filter((x) => x.app === a.id);
+    if (!extra.length) return a;
+    const screens = extra.map((x) => ({ id: x.id, name: x.name, route: x.route, tag: "New", purpose: "Found in the code by npm run capture; not yet described in design/handoff/spec.mjs." }));
+    return { ...a, sections: [...a.sections, { section: "Detected automatically · not yet documented", screens }] };
+  });
+  if (found.length) console.log(`Note: ${found.length} screen(s) exist in the code but not in spec.mjs: ${found.map((x) => x.app + ":" + x.route).join(", ")}`);
+  if (Object.keys(captures).length)
+    writeFileSync(root + "design/handoff/loadmaster-handoff-captured.json", JSON.stringify({ ...spec, apps, flows: [...journeys, ...spec.flows], captures }));
   const template = read("design/handoff/plugin/code.template.ts");
-  const marker = "/*__SPEC__*/ null";
+  const marker = "__SPEC__";
   if (!template.includes(marker))
     throw new Error("Spec marker missing in code.template.ts");
   writeFileSync(

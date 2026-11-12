@@ -90,6 +90,10 @@ function ConnectionBanner() {
 function Navigator() {
   const { data, role, token, ready } = useDemo();
   const ref = useNavigationContainerRef<RootStack>();
+  // Dev web builds only: lets the design capture (scripts/capture) open any
+  // screen by route name, so new screens are documented automatically.
+  if (__DEV__ && Platform.OS === "web" && typeof window !== "undefined")
+    (window as unknown as { __lmNav?: unknown }).__lmNav = ref;
   const [currentRoute, setCurrentRoute] = useState("Main");
   const offer = role === "driver" ? data?.offers[0] : undefined;
   if (!ready)

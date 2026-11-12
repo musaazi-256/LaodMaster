@@ -1,0 +1,146 @@
+[
+ {
+  "id": "auto-c-orderstart",
+  "app": "customer",
+  "route": "OrderStart",
+  "name": "Order Start"
+ },
+ {
+  "id": "auto-c-vehicle",
+  "app": "customer",
+  "route": "Vehicle",
+  "name": "Vehicle"
+ },
+ {
+  "id": "auto-c-password",
+  "app": "customer",
+  "route": "Password",
+  "name": "Password"
+ },
+ {
+  "id": "auto-c-payoutrequests",
+  "app": "customer",
+  "route": "PayoutRequests",
+  "name": "Payout Requests"
+ },
+ {
+  "id": "auto-c-rewards",
+  "app": "customer",
+  "route": "Rewards",
+  "name": "Rewards"
+ },
+ {
+  "id": "auto-c-supportcases",
+  "app": "customer",
+  "route": "SupportCases",
+  "name": "Support Cases"
+ },
+ {
+  "id": "auto-c-requesthistory",
+  "app": "customer",
+  "route": "RequestHistory",
+  "name": "Request History"
+ },
+ {
+  "id": "auto-c-settings",
+  "app": "customer",
+  "route": "Settings",
+  "name": "Settings"
+ },
+ {
+  "id": "auto-c-verification",
+  "app": "customer",
+  "route": "Verification",
+  "name": "Verification"
+ },
+ {
+  "id": "auto-c-help",
+  "app": "customer",
+  "route": "Help",
+  "name": "Help"
+ },
+ {
+  "id": "auto-d-orderstart",
+  "app": "driver",
+  "route": "OrderStart",
+  "name": "Order Start"
+ },
+ {
+  "id": "auto-d-paymentmethods",
+  "app": "driver",
+  "route": "PaymentMethods",
+  "name": "Payment Methods"
+ },
+ {
+  "id": "auto-d-savedplaces",
+  "app": "driver",
+  "route": "SavedPlaces",
+  "name": "Saved Places"
+ },
+ {
+  "id": "auto-d-preferences",
+  "app": "driver",
+  "route": "Preferences",
+  "name": "Preferences"
+ },
+ {
+  "id": "auto-d-password",
+  "app": "driver",
+  "route": "Password",
+  "name": "Password"
+ },
+ {
+  "id": "auto-d-rewards",
+  "app": "driver",
+  "route": "Rewards",
+  "name": "Rewards"
+ },
+ {
+  "id": "auto-d-supportcases",
+  "app": "driver",
+  "route": "SupportCases",
+  "name": "Support Cases"
+ },
+ {
+  "id": "auto-d-locations",
+  "app": "driver",
+  "route": "Locations",
+  "name": "Locations"
+ },
+ {
+  "id": "auto-d-orderchat",
+  "app": "driver",
+  "route": "OrderChat",
+  "name": "Order Chat"
+ },
+ {
+  "id": "auto-d-payment",
+  "app": "driver",
+  "route": "Payment",
+  "name": "Payment"
+ },
+ {
+  "id": "auto-d-settings",
+  "app": "driver",
+  "route": "Settings",
+  "name": "Settings"
+ },
+ {
+  "id": "auto-d-profile",
+  "app": "driver",
+  "route": "Profile",
+  "name": "Profile"
+ },
+ {
+  "id": "auto-d-support",
+  "app": "driver",
+  "route": "Support",
+  "name": "Support"
+ },
+ {
+  "id": "auto-d-help",
+  "app": "driver",
+  "route": "Help",
+  "name": "Help"
+ }
+]

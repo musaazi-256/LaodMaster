@@ -308,27 +308,29 @@
               "blocks": [
                 {
                   "t": "greet2",
+                  "brand": "LoadMaster",
                   "hello": "Hello, Alex 👋",
                   "title": "What are we moving today?"
                 },
                 {
-                  "t": "promo",
-                  "pill": "Cargo delivery, made simple",
-                  "title": "A truck for every load",
-                  "body": "From pickup to delivery, keep every load in sight."
+                  "t": "carousel",
+                  "pill": "Everyday cargo",
+                  "title": "A truck for\nevery load",
+                  "body": "From pickup to delivery,\nkeep every load in sight."
                 },
                 {
                   "t": "ctabar",
                   "title": "Order a cargo truck",
-                  "sub": "Set pickup and destination"
+                  "sub": "Set pickup and destination",
+                  "icon": "pin"
                 },
                 {
                   "t": "tiles",
                   "items": [
                     "Schedule\npickup",
                     "Order again",
-                    "Estimate\nprice",
-                    "Support"
+                    "Choose\na truck",
+                    "Match a\ndriver"
                   ]
                 },
                 {
@@ -1772,24 +1774,18 @@
               "name": "Orders",
               "route": "Main/Orders",
               "tab": "Orders",
-              "purpose": "All orders with search and status filters.",
+              "purpose": "All orders with search and status tabs (CustomerOrders).",
               "blocks": [
-                {
-                  "t": "eyebrow",
-                  "text": "EVERY MOVE, IN ONE PLACE"
-                },
                 {
                   "t": "title",
                   "text": "Your orders"
                 },
                 {
-                  "t": "field",
-                  "label": "Search orders",
-                  "value": "",
-                  "ph": "Order ID or location"
+                  "t": "search",
+                  "ph": "Search by order ID or location"
                 },
                 {
-                  "t": "chips",
+                  "t": "tabsline",
                   "items": [
                     "All",
                     "Active",
@@ -1800,27 +1796,88 @@
                   "sel": 0
                 },
                 {
-                  "t": "list",
+                  "t": "ordercards",
                   "items": [
                     {
-                      "title": "LM-1EA1A628",
-                      "sub": "Ntinda Shopping Centre → Acacia Mall",
-                      "badge": "ON THE WAY",
-                      "tone": "green"
+                      "id": "LM-1EA1A628",
+                      "badge": "On the way",
+                      "tone": "blue",
+                      "from": "Nakasero Market",
+                      "to": "Ntinda Shopping Centre",
+                      "price": "UGX 148,000"
                     },
                     {
-                      "title": "LM-22B8E004",
-                      "sub": "Acacia Mall → Kampala Road",
-                      "badge": "DELIVERED",
-                      "tone": "green"
+                      "id": "LM-22B8E004",
+                      "badge": "Delivered",
+                      "from": "Acacia Mall",
+                      "to": "Kampala Road",
+                      "price": "UGX 92,000"
                     },
                     {
-                      "title": "LM-0D91F3B2",
-                      "sub": "Najjeera → Namuwongo",
-                      "badge": "CANCELLED",
-                      "tone": "red"
+                      "id": "LM-0D91F3B2",
+                      "badge": "Cancelled",
+                      "tone": "red",
+                      "from": "Najjeera",
+                      "to": "Namuwongo",
+                      "price": "UGX 64,000"
                     }
                   ]
+                }
+              ]
+            },
+            {
+              "id": "c-order-details",
+              "name": "Order details · delivered",
+              "route": "Order (CargoDelivery)",
+              "purpose": "A finished order opened from Orders.",
+              "blocks": [
+                {
+                  "t": "nav",
+                  "title": "Order details",
+                  "flat": true
+                },
+                {
+                  "t": "titlebadge",
+                  "text": "Delivered",
+                  "badge": "Delivered"
+                },
+                {
+                  "t": "map",
+                  "h": 180
+                },
+                {
+                  "t": "eyebrow",
+                  "text": "Delivery completed · Handover confirmed."
+                },
+                {
+                  "t": "progress",
+                  "value": 1
+                },
+                {
+                  "t": "drivercard",
+                  "title": "Brian Kato · Isuzu Forward",
+                  "sub": "24 km route · UBB 920 B"
+                },
+                {
+                  "t": "routeline",
+                  "title": "My destination",
+                  "stops": [
+                    [
+                      "Pickup",
+                      "Nakasero Market",
+                      "Kampala Central"
+                    ],
+                    [
+                      "Destination",
+                      "Ntinda Shopping Centre",
+                      "Nakawa"
+                    ]
+                  ]
+                },
+                {
+                  "t": "btn",
+                  "text": "View payment receipt",
+                  "v": "secondary"
                 }
               ]
             },
@@ -1840,33 +1897,40 @@
                   "text": "Your payments"
                 },
                 {
-                  "t": "card",
-                  "label": "OUTSTANDING",
-                  "big": "UGX 53,000",
-                  "lines": [
-                    "Direct in-app payments. No wallet top-up needed."
-                  ]
+                  "t": "hero",
+                  "eyebrow": "OUTSTANDING",
+                  "title": "UGX 0",
+                  "body": "Direct in-app payments. No wallet top-up needed."
                 },
                 {
                   "t": "section",
                   "text": "Payment activity"
                 },
                 {
-                  "t": "list",
+                  "t": "payact",
                   "items": [
                     {
-                      "title": "LM-1EA1A628",
-                      "sub": "MTN Mobile Money",
-                      "badge": "AWAITING APPROVAL",
+                      "amount": "UGX 148,000",
+                      "sub": "MTN Mobile Money · LM-1EA1A628",
+                      "badge": "Awaiting approval",
                       "tone": "amber"
                     },
                     {
-                      "title": "LM-22B8E004",
-                      "sub": "Cash collection · Paid",
-                      "badge": "PAID",
-                      "tone": "green"
+                      "amount": "UGX 92,000",
+                      "sub": "Cash collection · LM-22B8E004",
+                      "badge": "Paid"
+                    },
+                    {
+                      "amount": "UGX 92,000",
+                      "sub": "Cash collection · LM-0D91F3B2",
+                      "badge": "Paid",
+                      "note": "Refunded UGX 92,000"
                     }
                   ]
+                },
+                {
+                  "t": "eyebrow",
+                  "text": "Demo payments only. No real money moves."
                 }
               ]
             },
@@ -1878,27 +1942,42 @@
               "purpose": "Account hub.",
               "blocks": [
                 {
-                  "t": "eyebrow",
-                  "text": "YOUR LOADMASTER"
-                },
-                {
                   "t": "title",
                   "text": "Account"
                 },
                 {
+                  "t": "profilehead",
+                  "initials": "AM",
+                  "name": "Alex Mukasa",
+                  "sub": "+256 700 000 101"
+                },
+                {
                   "t": "menu",
                   "items": [
-                    "Your profile",
-                    "Help & support",
-                    "Demo connection & accounts",
-                    "Payment methods",
-                    "Saved places",
-                    "Referrals & rewards",
-                    "Your support cases",
-                    "Change password",
-                    "Settings & privacy",
-                    "Sign out"
-                  ]
+                    [
+                      "user",
+                      "Your profile",
+                      "Update your name and contact details"
+                    ],
+                    [
+                      "headset",
+                      "Help & support",
+                      "Get help with orders and payments"
+                    ],
+                    [
+                      "card",
+                      "Payment methods",
+                      "Manage your cards and payment options"
+                    ],
+                    [
+                      "bookmark",
+                      "Saved places",
+                      "Manage pickup and drop-off locations"
+                    ]
+                  ],
+                  "more": "More account options",
+                  "logout": "Log out",
+                  "foot": "App demo. No real transactions."
                 }
               ]
             },
@@ -2683,8 +2762,7 @@
                   "t": "map",
                   "h": 230,
                   "route": false,
-                  "pulse": true,
-                  "label": "DEMO MAP · SIMULATED ROUTE"
+                  "pulse": true
                 },
                 {
                   "t": "toggle",
@@ -2692,11 +2770,10 @@
                   "on": false
                 },
                 {
-                  "t": "card",
-                  "lines": [
-                    "Take a moment. Then make a move.",
-                    "You won’t receive new requests while offline."
-                  ]
+                  "t": "drivercard",
+                  "icon": "car",
+                  "title": "Take a moment. Then make a move.",
+                  "sub": "You won’t receive new requests while offline."
                 }
               ],
               "actions": [
@@ -2744,8 +2821,7 @@
                   "t": "map",
                   "h": 230,
                   "route": false,
-                  "pulse": true,
-                  "label": "DEMO MAP · SIMULATED ROUTE"
+                  "pulse": true
                 },
                 {
                   "t": "toggle",
@@ -3524,18 +3600,23 @@
               "purpose": "Accepted deliveries plus link to request history.",
               "blocks": [
                 {
-                  "t": "eyebrow",
-                  "text": "EVERY MOVE, IN ONE PLACE"
-                },
-                {
                   "t": "title",
                   "text": "Your deliveries"
                 },
                 {
-                  "t": "field",
-                  "label": "Search orders",
-                  "value": "",
-                  "ph": "Order ID or location"
+                  "t": "search",
+                  "ph": "Search by order ID or location"
+                },
+                {
+                  "t": "tabsline",
+                  "items": [
+                    "All",
+                    "Active",
+                    "Scheduled",
+                    "Completed",
+                    "Cancelled"
+                  ],
+                  "sel": 0
                 },
                 {
                   "t": "btn",
@@ -3543,19 +3624,30 @@
                   "v": "secondary"
                 },
                 {
-                  "t": "list",
+                  "t": "ordercards",
                   "items": [
                     {
-                      "title": "LM-1EA1A628",
-                      "sub": "Ntinda Shopping Centre → Acacia Mall",
-                      "badge": "ON THE WAY",
-                      "tone": "green"
+                      "id": "LM-1EA1A628",
+                      "badge": "On the way",
+                      "tone": "blue",
+                      "from": "Nakasero Market",
+                      "to": "Ntinda Shopping Centre",
+                      "price": "UGX 148,000"
                     },
                     {
-                      "title": "LM-22B8E004",
-                      "sub": "Acacia Mall → Kampala Road",
-                      "badge": "DELIVERED",
-                      "tone": "green"
+                      "id": "LM-22B8E004",
+                      "badge": "Delivered",
+                      "from": "Acacia Mall",
+                      "to": "Kampala Road",
+                      "price": "UGX 92,000"
+                    },
+                    {
+                      "id": "LM-0D91F3B2",
+                      "badge": "Cancelled",
+                      "tone": "red",
+                      "from": "Najjeera",
+                      "to": "Namuwongo",
+                      "price": "UGX 64,000"
                     }
                   ]
                 }
@@ -3579,8 +3671,16 @@
                 {
                   "t": "hero",
                   "eyebrow": "SCHEDULED EARNINGS",
-                  "title": "UGX 45,050",
+                  "title": "UGX 567,800",
                   "body": "Earned from completed deliveries. Payout is separate from customer collection."
+                },
+                {
+                  "t": "card",
+                  "label": "PAID OUT",
+                  "big": "UGX 4,094,450",
+                  "lines": [
+                    "Demo settlement is managed through the demo service. A production payout cycle has not been set."
+                  ]
                 },
                 {
                   "t": "btn",
@@ -3588,19 +3688,24 @@
                   "v": "secondary"
                 },
                 {
-                  "t": "list",
+                  "t": "section",
+                  "text": "Withdrawal transactions"
+                },
+                {
+                  "t": "payact",
                   "items": [
                     {
-                      "title": "LM-1EA1A628",
-                      "sub": "Fare UGX 53,000 · Fee UGX 7,950",
-                      "badge": "SCHEDULED",
-                      "tone": "amber"
+                      "icon": "wallet",
+                      "amount": "UGX 420,000",
+                      "sub": "MTN Mobile Money · Payout",
+                      "badge": "Paid"
                     },
                     {
-                      "title": "LM-22B8E004",
-                      "sub": "Cash · earning retained",
-                      "badge": "RETAINED",
-                      "tone": "green"
+                      "icon": "wallet",
+                      "amount": "UGX 147,800",
+                      "sub": "Airtel Money · Payout",
+                      "badge": "Scheduled",
+                      "tone": "amber"
                     }
                   ]
                 }
@@ -3690,28 +3795,42 @@
               "purpose": "Driver account hub.",
               "blocks": [
                 {
-                  "t": "eyebrow",
-                  "text": "YOUR LOADMASTER"
-                },
-                {
                   "t": "title",
                   "text": "Account"
                 },
                 {
+                  "t": "profilehead",
+                  "initials": "BK",
+                  "name": "Brian Kato",
+                  "sub": "+256 700 000 201"
+                },
+                {
                   "t": "menu",
                   "items": [
-                    "Your profile",
-                    "Vehicle & verification",
-                    "Help & support",
-                    "Payment methods",
-                    "Payout requests",
-                    "Request history",
-                    "Referrals & rewards",
-                    "Your support cases",
-                    "Change password",
-                    "Settings & privacy",
-                    "Sign out"
-                  ]
+                    [
+                      "user",
+                      "Your profile",
+                      "Update your name and contact details"
+                    ],
+                    [
+                      "shield-check",
+                      "Vehicle & verification",
+                      "Registered truck and document status"
+                    ],
+                    [
+                      "headset",
+                      "Help & support",
+                      "Get help with orders and payments"
+                    ],
+                    [
+                      "card",
+                      "Payment methods",
+                      "Manage your cards and payment options"
+                    ]
+                  ],
+                  "more": "More account options",
+                  "logout": "Log out",
+                  "foot": "App demo. No real transactions."
                 }
               ]
             }
@@ -5422,6 +5541,147 @@
               ]
             },
             {
+              "id": "a-driver-profile",
+              "name": "Driver page · profile & device",
+              "route": "drivers (page › Profile)",
+              "tag": "New",
+              "page": {
+                "title": "Brian Kato",
+                "desc": "+256 700 000 222 · brian@example.test",
+                "meta": "Driver · driver-1",
+                "back": true,
+                "badges": [
+                  "Active",
+                  "Online",
+                  "Approved"
+                ]
+              },
+              "purpose": "Edit contact details, number plate and profile photo in place; see the phone and app version the driver uses.",
+              "blocks": [
+                {
+                  "t": "actions",
+                  "items": [
+                    "Edit details",
+                    "Message"
+                  ],
+                  "more": true
+                },
+                {
+                  "t": "tabs",
+                  "items": [
+                    "Trips (57)",
+                    "Transactions (64)",
+                    "Profile",
+                    "Requests",
+                    "Documents",
+                    "Support (0)",
+                    "Notes (1)",
+                    "Activity"
+                  ],
+                  "active": 2
+                },
+                {
+                  "t": "profile",
+                  "meta": "Driver · driver-1",
+                  "name": "Brian Kato",
+                  "email": "brian@example.test",
+                  "badges": [
+                    "Active",
+                    "Online",
+                    "Approved"
+                  ],
+                  "initials": "BK",
+                  "photo": true,
+                  "dirty": true,
+                  "fields": [
+                    [
+                      "Phone number",
+                      "+256 700 000 222",
+                      "Include the country code."
+                    ],
+                    [
+                      "Car registration number plate",
+                      "UBB 921 C",
+                      "As shown on the vehicle registration."
+                    ]
+                  ],
+                  "foot": "Update contact details, vehicle identification and profile photo."
+                },
+                {
+                  "t": "device",
+                  "sub": "Reported by the Driver app each time it connects.",
+                  "rows": [
+                    [
+                      "Device",
+                      "Samsung Galaxy A15"
+                    ],
+                    [
+                      "Device type",
+                      "Phone"
+                    ],
+                    [
+                      "Operating system",
+                      "Android 14"
+                    ],
+                    [
+                      "Device name",
+                      "Galaxy A15"
+                    ],
+                    [
+                      "App version",
+                      "2.0.0"
+                    ],
+                    [
+                      "Last active",
+                      "8 min ago"
+                    ],
+                    [
+                      "First seen on this device",
+                      "11/11/2026, 05:22"
+                    ]
+                  ],
+                  "earlier": [
+                    [
+                      "TECNO Spark 20",
+                      "Android 13 · app 1.9.4 · last active 22/09/2026"
+                    ]
+                  ]
+                }
+              ],
+              "actions": [
+                {
+                  "does": "Upload photo",
+                  "api": "POST /admin/user {photo}",
+                  "effect": "JPG/PNG up to 5 MB, resized to 256 px in the browser; null removes it. The audit records only whether a photo is set.",
+                  "affects": []
+                },
+                {
+                  "does": "Save changes",
+                  "api": "POST /admin/user {phone, plate, photo, reason}",
+                  "effect": "Asks for a reason first. Phone and plate are checked for duplicates; plate changes are blocked during a trip.",
+                  "affects": [
+                    {
+                      "app": "driver",
+                      "screen": "d-notifications",
+                      "what": "“Account updated” with the reason."
+                    }
+                  ]
+                }
+              ],
+              "states": [
+                "Save changes is disabled until something changes",
+                "Upload a JPG or PNG image · PHOTO_INVALID",
+                "Choose an image up to 5 MB · PHOTO_TOO_LARGE",
+                "Another driver is registered with this plate · PLATE_EXISTS",
+                "No device reported yet (account has not opened the app since device capture)"
+              ],
+              "notes": [
+                "Shown only to roles with “Edit, suspend and deactivate accounts”; the App & device section is visible to anyone who can open the page.",
+                "Device: the mobile apps send an X-Device header (URI-encoded JSON: platform, type, brand, model, osVersion, name, appVersion) on every request; the service keeps the current device and up to four earlier ones (recordDevice in services/demo/platform.mjs).",
+                "iOS reports only iPhone or iPad, not the exact model (expo-device would add it, with a native rebuild)."
+              ]
+            },
+            {
               "id": "a-driver-more",
               "name": "Driver page · More actions",
               "route": "drivers (page › More)",
@@ -5837,6 +6097,118 @@
                   ],
                   "pager": "1–7 of 7 records"
                 }
+              ]
+            },
+            {
+              "id": "a-customer-profile",
+              "name": "Customer page · profile & device",
+              "route": "customers (page › Profile)",
+              "tag": "New",
+              "page": {
+                "title": "Alex Mukasa",
+                "desc": "+256 700 000 111 · alex@example.test",
+                "meta": "Customer · customer-1",
+                "back": true,
+                "badges": [
+                  "Active"
+                ]
+              },
+              "purpose": "The same profile card as drivers, with email in place of the number plate, and the customer’s phone and app version.",
+              "blocks": [
+                {
+                  "t": "actions",
+                  "items": [
+                    "Edit details",
+                    "Message"
+                  ],
+                  "more": true
+                },
+                {
+                  "t": "tabs",
+                  "items": [
+                    "Trips (3)",
+                    "Transactions (7)",
+                    "Profile",
+                    "Support (1)",
+                    "Notes (1)",
+                    "Activity"
+                  ],
+                  "active": 2
+                },
+                {
+                  "t": "profile",
+                  "meta": "Customer · customer-1",
+                  "name": "Alex Mukasa",
+                  "email": "alex@example.test",
+                  "badges": [
+                    "Active"
+                  ],
+                  "initials": "AM",
+                  "fields": [
+                    [
+                      "Phone number",
+                      "+256 700 000 111",
+                      "Include the country code."
+                    ],
+                    [
+                      "Email",
+                      "alex@example.test",
+                      "Optional. Used for receipts and sign-in."
+                    ]
+                  ],
+                  "foot": "Update contact details and profile photo."
+                },
+                {
+                  "t": "device",
+                  "sub": "Reported by the Customer app each time it connects.",
+                  "rows": [
+                    [
+                      "Device",
+                      "Apple iPhone"
+                    ],
+                    [
+                      "Device type",
+                      "Phone"
+                    ],
+                    [
+                      "Operating system",
+                      "iOS 18.1"
+                    ],
+                    [
+                      "Device name",
+                      "Alex’s iPhone"
+                    ],
+                    [
+                      "App version",
+                      "2.0.0"
+                    ],
+                    [
+                      "Last active",
+                      "2 h ago"
+                    ],
+                    [
+                      "First seen on this device",
+                      "15/08/2026, 05:31"
+                    ]
+                  ]
+                }
+              ],
+              "actions": [
+                {
+                  "does": "Save changes",
+                  "api": "POST /admin/user {phone, email, photo, reason}",
+                  "effect": "Asks for a reason first; duplicate phone or email is rejected.",
+                  "affects": [
+                    {
+                      "app": "customer",
+                      "screen": "c-notifications",
+                      "what": "“Account updated” with the reason."
+                    }
+                  ]
+                }
+              ],
+              "notes": [
+                "Device: the mobile apps send an X-Device header (URI-encoded JSON: platform, type, brand, model, osVersion, name, appVersion) on every request; the service keeps the current device and up to four earlier ones (recordDevice in services/demo/platform.mjs)."
               ]
             }
           ]
@@ -7740,5 +8112,72 @@
     "Mutations call refresh() immediately; a refresh requested during a poll is queued, not dropped.",
     "Real-time = within one poll interval. Push/websockets are not implemented."
   ],
-  "generatedAt": "2026-11-12T01:53:12.922Z"
+  "icons": {
+    "car": "<path d=\"M19 17h2c.6 0 1-.4 1-1v-3c0-.9-.7-1.7-1.5-1.9C18.7 10.6 16 10 16 10s-1.3-1.4-2.2-2.3c-.5-.4-1.1-.7-1.8-.7H5c-.6 0-1.1.4-1.4.9l-1.4 2.9A3.7 3.7 0 0 0 2 12v4c0 .6.4 1 1 1h2\"/><circle cx=\"7\" cy=\"17\" r=\"2\"/><path d=\"M9 17h6\"/><circle cx=\"17\" cy=\"17\" r=\"2\"/>",
+    "user-plus": "<path d=\"M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2\"/><circle cx=\"9\" cy=\"7\" r=\"4\"/><path d=\"M19 8v6M22 11h-6\"/>",
+    "headset": "<path d=\"M3 14h3a2 2 0 0 1 2 2v3a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-7a9 9 0 0 1 18 0v7a2 2 0 0 1-2 2h-1a2 2 0 0 1-2-2v-3a2 2 0 0 1 2-2h3\"/>",
+    "log-out": "<path d=\"M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4M16 17l5-5-5-5M21 12H9\"/>",
+    "bookmark": "<path d=\"m19 21-7-4-7 4V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2v16z\"/>",
+    "shield-check": "<path d=\"M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z\"/><path d=\"m9 12 2 2 4-4\"/>",
+    "help-circle": "<circle cx=\"12\" cy=\"12\" r=\"10\"/><path d=\"M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3M12 17h.01\"/>",
+    "file-text": "<path d=\"M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z\"/><path d=\"M14 2v4a2 2 0 0 0 2 2h4M10 9H8M16 13H8M16 17H8\"/>",
+    "clipboard-check": "<rect width=\"8\" height=\"4\" x=\"8\" y=\"2\" rx=\"1\"/><path d=\"M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2\"/><path d=\"m9 14 2 2 4-4\"/>",
+    "wallet-cards": "<rect width=\"18\" height=\"18\" x=\"3\" y=\"3\" rx=\"2\"/><path d=\"M3 9a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2M3 11h3c.8 0 1.6.3 2.1.9l1.1.9c1.6 1.6 4.1 1.6 5.7 0l1.1-.9c.5-.5 1.3-.9 2.1-.9H21\"/>",
+    "gear": "<path d=\"M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z\"/><circle cx=\"12\" cy=\"12\" r=\"3\"/>",
+    "clock": "<circle cx=\"12\" cy=\"12\" r=\"10\"/><path d=\"M12 6v6l4 2\"/>",
+    "bell": "<path d=\"M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9\"/><path d=\"M10.3 21a1.94 1.94 0 0 0 3.4 0\"/>",
+    "truck": "<path d=\"M14 18V6a2 2 0 0 0-2-2H4a2 2 0 0 0-2 2v11a1 1 0 0 0 1 1h2\"/><path d=\"M15 18H9\"/><path d=\"M19 18h2a1 1 0 0 0 1-1v-3.65a1 1 0 0 0-.22-.62l-3.48-4.35A1 1 0 0 0 17.52 8H14\"/><circle cx=\"17\" cy=\"18\" r=\"2\"/><circle cx=\"7\" cy=\"18\" r=\"2\"/>",
+    "locate": "<circle cx=\"12\" cy=\"12\" r=\"7\"/><circle cx=\"12\" cy=\"12\" r=\"2.5\" fill=\"C\"/><path d=\"M12 2v3M12 19v3M2 12h3M19 12h3\"/>",
+    "wallet": "<path d=\"M19 7V4a1 1 0 0 0-1-1H5a2 2 0 0 0 0 4h15a1 1 0 0 1 1 1v4h-3a2 2 0 0 0 0 4h3a1 1 0 0 0 1-1v-2a1 1 0 0 0-1-1\"/><path d=\"M3 5v14a2 2 0 0 0 2 2h15a1 1 0 0 0 1-1v-4\"/>",
+    "eye": "<path d=\"M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z\"/><circle cx=\"12\" cy=\"12\" r=\"3\"/>",
+    "star": "<path fill=\"C\" d=\"M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z\"/>",
+    "chevron-right": "<path d=\"m9 18 6-6-6-6\"/>",
+    "chevron-left": "<path d=\"m15 18-6-6 6-6\"/>",
+    "chevron-down": "<path d=\"m6 9 6 6 6-6\"/>",
+    "arrow-right": "<path d=\"M5 12h14M12 5l7 7-7 7\"/>",
+    "arrow-left": "<path d=\"M19 12H5M12 19l-7-7 7-7\"/>",
+    "arrow-up-right": "<path d=\"M7 7h10v10M7 17 17 7\"/>",
+    "x": "<path d=\"M18 6 6 18M6 6l12 12\"/>",
+    "check": "<path d=\"M20 6 9 17l-5-5\"/>",
+    "plus": "<path d=\"M5 12h14M12 5v14\"/>",
+    "minus": "<path d=\"M5 12h14\"/>",
+    "trophy": "<path d=\"M6 9H4.5a2.5 2.5 0 0 1 0-5H6M18 9h1.5a2.5 2.5 0 0 0 0-5H18M4 22h16M10 14.66V17c0 .55-.47.98-.97 1.21C7.85 18.75 7 20.24 7 22M14 14.66V17c0 .55.47.98.97 1.21C16.15 18.75 17 20.24 17 22M18 2H6v7a6 6 0 0 0 12 0V2Z\"/>",
+    "package": "<path d=\"M21 8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16Z\"/><path d=\"m3.3 7 8.7 5 8.7-5M12 22V12\"/>",
+    "navigation": "<path d=\"M3 11 22 2l-9 19-2-8-8-2z\"/>",
+    "flag": "<path d=\"M4 15s1-1 4-1 5 2 8 2 4-1 4-1V3s-1 1-4 1-5-2-8-2-4 1-4 1zM4 22v-7\"/>",
+    "card": "<rect width=\"20\" height=\"14\" x=\"2\" y=\"5\" rx=\"2\"/><path d=\"M2 10h20\"/>",
+    "search": "<circle cx=\"11\" cy=\"11\" r=\"8\"/><path d=\"m21 21-4.3-4.3\"/>",
+    "download": "<path d=\"M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M7 10l5 5 5-5M12 15V3\"/>",
+    "upload": "<path d=\"M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M17 8l-5-5-5 5M12 3v12\"/>",
+    "columns": "<rect width=\"18\" height=\"18\" x=\"3\" y=\"3\" rx=\"2\"/><path d=\"M9 3v18M15 3v18\"/>",
+    "pin": "<path d=\"M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0Z\"/><circle cx=\"12\" cy=\"10\" r=\"3\"/>",
+    "dashboard": "<rect width=\"7\" height=\"9\" x=\"3\" y=\"3\" rx=\"1\"/><rect width=\"7\" height=\"5\" x=\"14\" y=\"3\" rx=\"1\"/><rect width=\"7\" height=\"9\" x=\"14\" y=\"12\" rx=\"1\"/><rect width=\"7\" height=\"5\" x=\"3\" y=\"16\" rx=\"1\"/>",
+    "route": "<circle cx=\"6\" cy=\"19\" r=\"3\"/><path d=\"M9 19h8.5a3.5 3.5 0 0 0 0-7h-11a3.5 3.5 0 0 1 0-7H15\"/><circle cx=\"18\" cy=\"5\" r=\"3\"/>",
+    "users": "<path d=\"M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2\"/><circle cx=\"9\" cy=\"7\" r=\"4\"/><path d=\"M22 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75\"/>",
+    "user": "<circle cx=\"12\" cy=\"8\" r=\"4\"/><path d=\"M4 21a8 8 0 0 1 16 0\"/>",
+    "banknote": "<rect width=\"20\" height=\"12\" x=\"2\" y=\"6\" rx=\"2\"/><circle cx=\"12\" cy=\"12\" r=\"2\"/><path d=\"M6 12h.01M18 12h.01\"/>",
+    "transfer": "<path d=\"m16 3 4 4-4 4M20 7H4M8 21l-4-4 4-4M4 17h16\"/>",
+    "reconcile": "<path d=\"M18 6 7 17l-5-5M22 10l-7.5 7.5L13 16\"/>",
+    "gift": "<rect x=\"3\" y=\"8\" width=\"18\" height=\"4\" rx=\"1\"/><path d=\"M12 8v13M19 12v7a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2v-7M7.5 8a2.5 2.5 0 0 1 0-5C10 3 12 8 12 8s2-5 4.5-5a2.5 2.5 0 0 1 0 5\"/>",
+    "support": "<circle cx=\"12\" cy=\"12\" r=\"10\"/><circle cx=\"12\" cy=\"12\" r=\"4\"/><path d=\"m4.93 4.93 4.24 4.24M14.83 9.17l4.24-4.24M14.83 14.83l4.24 4.24M9.17 14.83l-4.24 4.24\"/>",
+    "shield": "<path d=\"M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z\"/>",
+    "history": "<path d=\"M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8\"/><path d=\"M3 3v5h5M12 7v5l4 2\"/>",
+    "chart": "<path d=\"M3 3v18h18M18 17V9M13 17V5M8 17v-3\"/>",
+    "settings": "<path d=\"M21 4h-7M10 4H3M21 12h-9M8 12H3M21 20h-5M12 20H3M14 2v4M8 10v4M16 18v4\"/>",
+    "activity": "<path d=\"M22 12h-4l-3 9L9 3l-3 9H2\"/>",
+    "phone": "<rect width=\"14\" height=\"20\" x=\"5\" y=\"2\" rx=\"2\"/><path d=\"M12 18h.01\"/>",
+    "home": "<path d=\"M3 10l9-7 9 7v10a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z\"/><path d=\"M9 22V12h6v10\"/>",
+    "list": "<path d=\"M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01\"/>",
+    "receipt": "<path d=\"M4 2v20l3-2 3 2 3-2 3 2 3-2 3 2V2l-3 2-3-2-3 2-3-2-3 2z\"/><path d=\"M8 8h8M8 12h8\"/>",
+    "calendar": "<rect width=\"18\" height=\"18\" x=\"3\" y=\"4\" rx=\"2\"/><path d=\"M16 2v4M8 2v4M3 10h18\"/>",
+    "repeat": "<path d=\"m17 2 4 4-4 4M3 11v-1a4 4 0 0 1 4-4h14M7 22l-4-4 4-4M21 13v1a4 4 0 0 1-4 4H3\"/>",
+    "tag": "<path d=\"M12.6 2.6A2 2 0 0 0 11.2 2H4a2 2 0 0 0-2 2v7.2a2 2 0 0 0 .6 1.4l8.7 8.7a2.4 2.4 0 0 0 3.4 0l6.6-6.6a2.4 2.4 0 0 0 0-3.4z\"/><circle cx=\"7.5\" cy=\"7.5\" r=\"1.5\" fill=\"C\"/>",
+    "signal": "<path d=\"M2 20h.01M7 20v-4M12 20v-8M17 20V8M22 4v16\"/>",
+    "battery": "<rect width=\"16\" height=\"10\" x=\"2\" y=\"7\" rx=\"2\"/><rect width=\"9\" height=\"4\" x=\"5\" y=\"10\" rx=\"1\" fill=\"C\" stroke=\"none\"/><path d=\"M22 11v2\"/>",
+    "pencil": "<path d=\"M12 20h9M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z\"/>",
+    "message": "<path d=\"M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z\"/>",
+    "dot": "<circle cx=\"12\" cy=\"12\" r=\"5\" fill=\"C\"/>",
+    "ring": "<circle cx=\"12\" cy=\"12\" r=\"6\"/>"
+  },
+  "generatedAt": "2026-11-12T17:35:39.139Z"
 }

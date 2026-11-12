@@ -1,0 +1,396 @@
+{
+ "j-topup": {
+  "id": "j-topup",
+  "title": "Customer tops up the wallet",
+  "summary": "Alex adds UGX 75,000 to the LoadMaster wallet with Airtel Money. The demo approves instantly; the balance on Home updates and operations sees the top-up in the money ledger.",
+  "big": true,
+  "steps": [
+   {
+    "lane": "customer",
+    "label": "Home shows the wallet balance. Tap Add funds.",
+    "screen": "j-topup-01",
+    "col": 0
+   },
+   {
+    "lane": "customer",
+    "label": "The Add funds sheet opens with the current balance.",
+    "screen": "j-topup-02",
+    "col": 1
+   },
+   {
+    "lane": "customer",
+    "label": "Enter the amount and choose Airtel Money.",
+    "screen": "j-topup-03",
+    "col": 2
+   },
+   {
+    "lane": "customer",
+    "label": "Approve the demo top-up: success confirmation.",
+    "screen": "j-topup-04",
+    "col": 3
+   },
+   {
+    "lane": "system",
+    "label": "POST /account/wallet · wallet_topup posted to the ledger (customer wallet ← Airtel Money)",
+    "api": "POST /account/wallet",
+    "col": 4
+   },
+   {
+    "lane": "customer",
+    "label": "Close the sheet: Home shows the new balance.",
+    "screen": "j-topup-05",
+    "col": 5
+   },
+   {
+    "lane": "admin",
+    "label": "Transfers ledger lists the wallet top-up.",
+    "screen": "j-topup-06",
+    "col": 6
+   },
+   {
+    "lane": "admin",
+    "label": "Collections and reconciliation stay balanced.",
+    "screen": "j-topup-07",
+    "col": 7
+   }
+  ],
+  "edges": [
+   [
+    0,
+    1,
+    ""
+   ],
+   [
+    1,
+    2,
+    ""
+   ],
+   [
+    2,
+    3,
+    ""
+   ],
+   [
+    3,
+    4,
+    ""
+   ],
+   [
+    4,
+    5,
+    ""
+   ],
+   [
+    5,
+    6,
+    ""
+   ],
+   [
+    6,
+    7,
+    ""
+   ]
+  ]
+ },
+ "j-payout": {
+  "id": "j-payout",
+  "title": "Driver is paid out",
+  "summary": "Brian withdraws UGX 150,000 of unpaid earnings to Airtel Money. Operations reviews the request and approves it for finance payment; Brian sees the request move on in the app.",
+  "big": true,
+  "steps": [
+   {
+    "lane": "driver",
+    "label": "Earnings shows scheduled (unpaid) earnings.",
+    "screen": "j-payout-01",
+    "col": 0
+   },
+   {
+    "lane": "driver",
+    "label": "Open payout requests: choose an amount and a payout platform.",
+    "screen": "j-payout-02",
+    "col": 1
+   },
+   {
+    "lane": "driver",
+    "label": "Enter UGX 150,000 and pick Airtel Money.",
+    "screen": "j-payout-03",
+    "col": 2
+   }
+  ],
+  "edges": [
+   [
+    0,
+    1,
+    ""
+   ],
+   [
+    1,
+    2,
+    ""
+   ]
+  ]
+ },
+ "j-driver-onboarding": {
+  "id": "j-driver-onboarding",
+  "title": "New driver registers and gets verified",
+  "summary": "Grace creates a driver account, confirms the demo code, adds her truck and submits the four required documents. Operations approves each document and then the driver, after which Grace can go online.",
+  "big": true,
+  "steps": [
+   {
+    "lane": "driver",
+    "label": "Driver app sign-in. Tap Create account.",
+    "screen": "j-driver-onboarding-01",
+    "col": 0
+   },
+   {
+    "lane": "driver",
+    "label": "Registration form.",
+    "screen": "j-driver-onboarding-02",
+    "col": 1
+   },
+   {
+    "lane": "driver",
+    "label": "Fill name, phone, email and password.",
+    "screen": "j-driver-onboarding-03",
+    "col": 2
+   },
+   {
+    "lane": "driver",
+    "label": "Create account: enter the demo verification code.",
+    "screen": "j-driver-onboarding-04",
+    "col": 3
+   },
+   {
+    "lane": "driver",
+    "label": "Verify & continue: Home asks for verification before going online.",
+    "screen": "j-driver-onboarding-05",
+    "col": 4
+   },
+   {
+    "lane": "driver",
+    "label": "Account › Vehicle & verification: nothing submitted yet.",
+    "screen": "j-driver-onboarding-06",
+    "col": 5
+   },
+   {
+    "lane": "driver",
+    "label": "Edit vehicle details: model and licence plate.",
+    "screen": "j-driver-onboarding-07",
+    "col": 6
+   },
+   {
+    "lane": "driver",
+    "label": "Submit vehicle for review.",
+    "screen": "j-driver-onboarding-08",
+    "col": 7
+   },
+   {
+    "lane": "system",
+    "label": "POST /account/document ×4 · Driver licence, Identity document, Vehicle registration, Third-party insurance (photos picked on the phone)",
+    "api": "POST /account/document",
+    "col": 8
+   },
+   {
+    "lane": "driver",
+    "label": "All four documents submitted: awaiting review.",
+    "screen": "j-driver-onboarding-09",
+    "col": 9
+   },
+   {
+    "lane": "admin",
+    "label": "Drivers list: Grace is awaiting review.",
+    "screen": "j-driver-onboarding-10",
+    "col": 10
+   },
+   {
+    "lane": "admin",
+    "label": "Driver page: vehicle and documents to review.",
+    "screen": "j-driver-onboarding-11",
+    "col": 11
+   },
+   {
+    "lane": "admin",
+    "label": "Documents tab › Review the driver licence: Approve, with a note.",
+    "screen": "j-driver-onboarding-12",
+    "col": 12
+   },
+   {
+    "lane": "admin",
+    "label": "Save, then approve the other three documents the same way.",
+    "screen": "j-driver-onboarding-13",
+    "col": 13
+   },
+   {
+    "lane": "admin",
+    "label": "Approve driver & vehicle.",
+    "screen": "j-driver-onboarding-14",
+    "col": 14
+   },
+   {
+    "lane": "admin",
+    "label": "Confirm: Grace is an approved driver.",
+    "screen": "j-driver-onboarding-15",
+    "col": 15
+   },
+   {
+    "lane": "driver",
+    "label": "Vehicle & verification now shows Grace as approved.",
+    "screen": "j-driver-onboarding-16",
+    "col": 16
+   },
+   {
+    "lane": "driver",
+    "label": "Home: verified, Grace can go online.",
+    "screen": "j-driver-onboarding-17",
+    "col": 17
+   }
+  ],
+  "edges": [
+   [
+    0,
+    1,
+    ""
+   ],
+   [
+    1,
+    2,
+    ""
+   ],
+   [
+    2,
+    3,
+    ""
+   ],
+   [
+    3,
+    4,
+    ""
+   ],
+   [
+    4,
+    5,
+    ""
+   ],
+   [
+    5,
+    6,
+    ""
+   ],
+   [
+    6,
+    7,
+    ""
+   ],
+   [
+    7,
+    8,
+    ""
+   ],
+   [
+    8,
+    9,
+    ""
+   ],
+   [
+    9,
+    10,
+    ""
+   ],
+   [
+    10,
+    11,
+    ""
+   ],
+   [
+    11,
+    12,
+    ""
+   ],
+   [
+    12,
+    13,
+    ""
+   ],
+   [
+    13,
+    14,
+    ""
+   ],
+   [
+    14,
+    15,
+    ""
+   ],
+   [
+    15,
+    16,
+    ""
+   ],
+   [
+    16,
+    17,
+    ""
+   ]
+  ]
+ },
+ "j-customer-signup": {
+  "id": "j-customer-signup",
+  "title": "New customer creates an account",
+  "summary": "A new customer registers in the customer app, confirms the demo code and lands on Home ready to order a truck.",
+  "big": true,
+  "steps": [
+   {
+    "lane": "customer",
+    "label": "Customer app sign-in. Tap Create account.",
+    "screen": "j-customer-signup-01",
+    "col": 0
+   },
+   {
+    "lane": "customer",
+    "label": "Registration form.",
+    "screen": "j-customer-signup-02",
+    "col": 1
+   },
+   {
+    "lane": "customer",
+    "label": "Fill name, phone, email and password.",
+    "screen": "j-customer-signup-03",
+    "col": 2
+   },
+   {
+    "lane": "customer",
+    "label": "Create account: enter the demo verification code.",
+    "screen": "j-customer-signup-04",
+    "col": 3
+   },
+   {
+    "lane": "customer",
+    "label": "Verify & continue: Home, ready to order.",
+    "screen": "j-customer-signup-05",
+    "col": 4
+   }
+  ],
+  "edges": [
+   [
+    0,
+    1,
+    ""
+   ],
+   [
+    1,
+    2,
+    ""
+   ],
+   [
+    2,
+    3,
+    ""
+   ],
+   [
+    3,
+    4,
+    ""
+   ]
+  ]
+ }
+}

@@ -55,7 +55,7 @@
         <div class="hint" id="replaceHint">Clears layers this plugin made on its LM pages before drawing. Your own layers are kept.</div>
       </fig-group>
       <fig-group name="Spec from the code">
-        <div class="hint" id="specHint">Using the built-in spec. To use a newer one, run <code>npm run handoff</code> in the repo and choose design/handoff/loadmaster-handoff.json (optional).</div>
+        <div class="hint" id="specHint">Checking GitHub for the latest spec…</div>
         <input type="file" id="nativeFile" accept=".json,application/json" class="file">
       </fig-group>
     </fig-content>
@@ -178,7 +178,42 @@
         })
       }).observe(root)
     }
+    // The latest spec committed to main. Newer than the built-in copy → use it,
+    // so changes reach the plugin on push without redeploying it. The captured
+    // bundle (npm run capture: real app screens + journeys) is preferred.
+    const REMOTE = 'https://raw.githubusercontent.com/musaazi-256/LaodMaster/main/design/handoff/'
+    async function fetchSpec(file, ms) {
+      const ctl = new AbortController()
+      const timer = setTimeout(() => ctl.abort(), ms)
+      try {
+        const res = await fetch(REMOTE + file + '?t=' + Date.now(), { signal: ctl.signal, cache: 'no-store' })
+        if (!res.ok) throw new Error('HTTP ' + res.status)
+        const spec = await res.json()
+        if (!spec || !Array.isArray(spec.apps) || !Array.isArray(spec.flows)) throw new Error('shape')
+        return spec
+      } finally {
+        clearTimeout(timer)
+      }
+    }
+    async function latest(builtin) {
+      $('specHint').textContent = 'Fetching the latest captured designs from GitHub…'
+      for (const [file, label, ms] of [['loadmaster-handoff-captured.json', 'captured app screens and journeys', 45000], ['loadmaster-handoff.json', 'spec', 6000]]) {
+        try {
+          const remote = await fetchSpec(file, ms)
+          if (builtin && !remote.captures && Date.parse(remote.generatedAt) <= Date.parse(builtin.generatedAt || 0)) continue
+          $('specHint').textContent = 'Using the latest ' + label + ' from GitHub (main).'
+          return remote
+        } catch (e) {
+          // Try the next source.
+        }
+      }
+      $('specHint').textContent =
+        'Using the built-in spec (GitHub copy not reachable). You can also choose design/handoff/loadmaster-handoff-captured.json.'
+      return builtin
+    }
     unpack(PACKED_SPEC)
+      .catch(() => null)
+      .then(latest)
       .then((spec) => { BUILTIN_SPEC = spec; haveSpec = !!spec })
       .catch(() => setStatus('Couldn’t read the built-in spec. Choose loadmaster-handoff.json instead.', 'error'))
       .finally(() => post({ type: 'ready' }))
