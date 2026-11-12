@@ -1,0 +1,8 @@
+source 'https://rubygems.org'
+gem 'cocoapods', '1.16.2'
+gem 'ffi', '1.16.3'
+gem 'activesupport', '6.1.7.10'
+gem 'drb', '2.0.6'
+gem 'bigdecimal', '3.1.8'
+gem 'zeitwerk', '2.6.18'
+gem 'concurrent-ruby', '1.3.4'

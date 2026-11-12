@@ -1,0 +1,21 @@
+{
+  "source": "/Volumes/MAISHA/Backup LoadMaster V2/src/assets/home",
+  "date": "2026-11-05",
+  "assets": [
+    {
+      "file": "packages/mobile/assets/home/everyday-cargo.webp",
+      "bytes": 46448,
+      "sha256": "d626af39cec5ff4bdd843c6b2025d65d25fa32d2811d42de1fc5910e5de4eb1d"
+    },
+    {
+      "file": "packages/mobile/assets/home/household-move.webp",
+      "bytes": 37440,
+      "sha256": "07a5b3e1a9ac093e160a97bc2493a3fe2e0eb4159c2e7c0fe59f3af1d613cb6c"
+    },
+    {
+      "file": "packages/mobile/assets/home/business-delivery.webp",
+      "bytes": 69012,
+      "sha256": "01092866ba6704bea9bce668fa651886f0565e26d6cf5d4bb214e646b606dfac"
+    }
+  ]
+}

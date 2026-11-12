@@ -1,0 +1,9 @@
+# Home design ZIP integration
+
+Applied the user-supplied loadmastr-home-code.zip concept to the working customer app only. Figma is explicitly deferred until user approval.
+
+Adapted the gradient hero and cargo illustration, green booking action, four quick actions including Support, wallet surface and recent activity rows. Integrated with the existing phone/status-bar/navigation shell rather than nesting the ZIP's standalone preview shell. CSS is scoped to customer Home and does not set body/global layout. Omitted nonfunctional carousel indicators.
+
+Preserved profile/balance/trip data from AppStateContext, immediate booking, separate scheduled pickup, estimator, wallet deposit route, per-account balance hiding/collapse, current-trip tracking and customer-to-driver dispatch. The active-delivery hero uses current status/route and a labelled simulated ETA; recent rows retain correct completed/cancelled statuses and long routes wrap. No hardcoded sample trips or balances were imported. Support launched from Home now returns Home; existing account entry keeps its prior return destination.
+
+Validation: build/lint/whitespace and typography regression checks pass with pre-existing advisory warnings. Existing isolated database suite passes, including smaller-load dispatch to the Medium driver and offline/busy exclusions. Browser checks cover idle and active Home, booking route entry, estimator, separate schedule route, Support and Back, privacy after reload and tracking the actual active trip. No horizontal page overflow at the standard phone width. Saved home-zip-idle.png after visual verification. The active-state browser check confirmed the working tracking action. Test accounts were disposable, logged out, and their temporary preview was stopped. Existing user accounts were not changed.

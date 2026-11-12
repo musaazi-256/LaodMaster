@@ -1,0 +1,188 @@
+<!doctype html>
+<html>
+<head>
+  <script>
+    try {
+      window.localStorage.getItem('x')
+    } catch (e) {
+      const store = new Map()
+      const shim = {
+        getItem: (key) => (store.has(key) ? store.get(key) : null),
+        setItem: (key, value) => { store.set(key, String(value)) },
+        removeItem: (key) => { store.delete(key) },
+        clear: () => { store.clear() },
+        key: (index) => Array.from(store.keys())[index] ?? null,
+        get length() { return store.size },
+      }
+      Object.defineProperty(window, 'localStorage', { value: shim, configurable: true })
+    }
+  </script>
+  <style>
+    html, body { margin: 0; padding: 0; height: auto; min-height: 0; }
+    body { display: block; font-family: var(--font-family); }
+    #plugin-root { height: auto; }
+    body > #plugin-root > fig-footer {
+      background-color: var(--figma-color-bg);
+      box-shadow: inset 0 1px 0 0 var(--figma-color-border);
+      border-radius: 0 0 var(--radius-large) var(--radius-large);
+      display: flex; flex-direction: column; align-items: stretch; gap: var(--spacer-2, 8px);
+    }
+    .summary { color: var(--figma-color-text-secondary); font-size: 11px; line-height: 16px; padding: 0 var(--spacer-3, 12px); }
+    .summary strong { color: var(--figma-color-text); font-weight: 600; }
+    #status { font-size: 11px; line-height: 16px; color: var(--figma-color-text-secondary); }
+    #status.error { color: var(--figma-color-text-danger); }
+    #status.done { color: var(--figma-color-text-success); }
+    .bar { height: 4px; border-radius: 2px; background: var(--figma-color-bg-secondary); overflow: hidden; }
+    .bar > div { height: 100%; width: 0; background: var(--figma-color-bg-brand); transition: width .2s; }
+    .file { font-size: 11px; color: var(--figma-color-text); margin-top: 6px; max-width: 100%; }
+    .hint { font-size: 11px; color: var(--figma-color-text-tertiary); line-height: 15px; }
+  </style>
+</head>
+<body>
+  <div id="plugin-root">
+    <fig-content>
+      <div class="summary" id="summary">Checking for a saved spec…</div>
+      <fig-group name="Pages to generate">
+        <fig-field direction="horizontal"><label>Customer app</label><fig-switch id="customer" checked="true"></fig-switch></fig-field>
+        <fig-field direction="horizontal"><label>Driver app</label><fig-switch id="driver" checked="true"></fig-switch></fig-field>
+        <fig-field direction="horizontal"><label>Admin portal</label><fig-switch id="admin" checked="true"></fig-switch></fig-field>
+        <fig-field direction="horizontal"><label>Cross-app flows & states</label><fig-switch id="flows" checked="true"></fig-switch></fig-field>
+        <fig-field direction="horizontal"><label>Foundations</label><fig-switch id="foundations" checked="true"></fig-switch></fig-field>
+      </fig-group>
+      <fig-group name="Options">
+        <fig-field direction="horizontal"><label>Developer annotations</label><fig-switch id="notes" checked="true"></fig-switch></fig-field>
+        <fig-field direction="horizontal"><label>Replace earlier output</label><fig-switch id="replace" checked="true"></fig-switch></fig-field>
+        <div class="hint" id="replaceHint">Clears layers this plugin made on its LM pages before drawing. Your own layers are kept.</div>
+      </fig-group>
+      <fig-group name="Spec from the code">
+        <div class="hint" id="specHint">Using the built-in spec. To use a newer one, run <code>npm run handoff</code> in the repo and choose design/handoff/loadmaster-handoff.json (optional).</div>
+        <input type="file" id="nativeFile" accept=".json,application/json" class="file">
+      </fig-group>
+    </fig-content>
+    <fig-footer sticky>
+      <div class="bar"><div id="bar"></div></div>
+      <label id="status">Ready</label>
+      <fig-button id="run" type="submit">Generate handoff</fig-button>
+    </fig-footer>
+  </div>
+  <script>
+  // Wrapped so nothing here collides with globals injected into the panel.
+  window.addEventListener('error', (e) => {
+    const el = document.getElementById('status')
+    if (el) { el.textContent = 'Panel error: ' + (e.message || 'unknown'); el.className = 'error' }
+  })
+  ;(() => {
+    const post = (message) => parent.postMessage({ pluginMessage: message }, '*')
+    const $ = (id) => document.getElementById(id)
+    const on = (id) => {
+      const el = $(id)
+      const v = el.checked ?? el.getAttribute('checked') ?? el.value
+      return v === true || v === 'true' || v === 'checked' || v === ''
+    }
+    // Built from design/handoff/spec.mjs by scripts/handoff.mjs.
+    // deflate-raw + base64 keeps the deployed panel under the upload limit.
+    const PACKED_SPEC = /*__SPEC__*/ null
+    let BUILTIN_SPEC = null
+    async function unpack(b64) {
+      if (!b64 || typeof DecompressionStream === 'undefined') return null
+      const bytes = Uint8Array.from(atob(b64.replace(/\s+/g, '')), (c) => c.charCodeAt(0))
+      const stream = new Blob([bytes]).stream().pipeThrough(new DecompressionStream('deflate-raw'))
+      return JSON.parse(await new Response(stream).text())
+    }
+    let specText = null
+    let running = false
+    let haveSpec = !!BUILTIN_SPEC
+    function setReady(v) {
+      haveSpec = v
+      if (v) $('run').removeAttribute('disabled')
+      else $('run').setAttribute('disabled', 'true')
+    }
+
+    function setStatus(text, kind) {
+      const s = $('status')
+      s.textContent = text
+      s.className = kind || ''
+    }
+    function readFile(file) {
+      if (!file) return
+      const reader = new FileReader()
+      reader.onload = () => {
+        try {
+          const parsed = JSON.parse(String(reader.result))
+          if (!parsed || !Array.isArray(parsed.apps)) throw new Error('shape')
+          specText = String(reader.result)
+          const screens = parsed.apps.reduce((n, a) => n + a.sections.reduce((m, s) => m + s.screens.length, 0), 0)
+          $('specHint').textContent = 'Using ' + (file.name || 'file') + ': ' + screens + ' screens, ' + (parsed.flows || []).length + ' flows. It replaces the built-in spec for this run.'
+          setReady(true)
+          setStatus('Ready')
+        } catch (e) {
+          specText = null
+          setStatus('That file isn’t a LoadMaster handoff spec (loadmaster-handoff.json).', 'error')
+        }
+      }
+      reader.readAsText(file)
+    }
+    $('nativeFile').addEventListener('change', (e) => readFile(e.target.files && e.target.files[0]))
+
+    $('run').addEventListener('click', () => {
+      if (running || !haveSpec) return
+      const parts = {
+        customer: on('customer'), driver: on('driver'), admin: on('admin'),
+        flows: on('flows'), foundations: on('foundations'),
+      }
+      if (!Object.values(parts).some(Boolean)) {
+        setStatus('Choose at least one page to generate.', 'error')
+        return
+      }
+      running = true
+      $('run').setAttribute('disabled', 'true')
+      setStatus('Starting…')
+      const text = specText || (BUILTIN_SPEC ? JSON.stringify(BUILTIN_SPEC) : undefined)
+      post({ type: 'generate', specText: text, parts, notes: on('notes'), replace: on('replace') })
+    })
+
+    window.onmessage = (event) => {
+      const msg = event.data && event.data.pluginMessage
+      if (!msg) return
+      if (msg.type === 'info') {
+        const s = msg.spec
+        const names = { customer: 'Customer', driver: 'Driver', admin: 'Admin' }
+        const existing = msg.existing ? '<br>' + msg.existing + ' LM page(s) already in this file' : ''
+        const b = BUILTIN_SPEC
+        const count = (a) => a.sections.reduce((m, x) => m + x.screens.length, 0)
+        $('summary').innerHTML = b
+          ? '<strong>' + b.name + '</strong><br>' + b.apps.map((a) => names[a.id] + ' ' + count(a)).join(' · ') + ' screens · ' + b.flows.length + ' flows' +
+            (b.generatedAt ? '<br>Spec built ' + new Date(b.generatedAt).toLocaleString() : '') + existing
+          : '<strong>LoadMaster developer handoff</strong><br>Choose loadmaster-handoff.json to begin.' + existing
+        setReady(!!b || !!specText || !!s)
+      } else if (msg.type === 'status') {
+        setStatus(msg.text)
+        if (typeof msg.progress === 'number') $('bar').style.width = Math.round(Math.min(1, msg.progress) * 100) + '%'
+      } else if (msg.type === 'done' || msg.type === 'error') {
+        running = false
+        setReady(haveSpec)
+        if (msg.type === 'done') $('bar').style.width = '100%'
+        setStatus(msg.text, msg.type)
+      }
+    }
+
+    let last = 0
+    let raf = 0
+    const root = $('plugin-root')
+    if (typeof ResizeObserver !== 'undefined') {
+      new ResizeObserver(() => {
+        if (raf) cancelAnimationFrame(raf)
+        raf = requestAnimationFrame(() => {
+          const h = Math.ceil(root.getBoundingClientRect().height)
+          if (h && h !== last) { last = h; post({ type: 'resize', height: h }) }
+        })
+      }).observe(root)
+    }
+    unpack(PACKED_SPEC)
+      .then((spec) => { BUILTIN_SPEC = spec; haveSpec = !!spec })
+      .catch(() => setStatus('Couldn’t read the built-in spec. Choose loadmaster-handoff.json instead.', 'error'))
+      .finally(() => post({ type: 'ready' }))
+  })()
+  </script>
+</body>
+</html>

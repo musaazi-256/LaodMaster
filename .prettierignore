@@ -1,0 +1,9 @@
+node_modules/
+**/node_modules/
+**/ios/
+**/android/
+**/dist/
+**/.expo/
+services/demo/data/
+audits/
+design/

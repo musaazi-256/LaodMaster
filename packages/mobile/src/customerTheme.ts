@@ -1,0 +1,16 @@
+export const customerTheme = {
+  ink: "#111827",
+  muted: "#6B7280",
+  green: "#087443",
+  brandGreen: "#087443",
+  border: "#E5E7EB",
+  sheetBg: "#F3F4F6",
+  background: "#FAFBFA",
+  pale: "#F0FAF4",
+  statusBoxBg: "#EEF7F2",
+  statusBoxBorder: "#68B684",
+  blue: "#3B66D6",
+  danger: "#E5254B",
+  pinkSoft: "#FDE8EC",
+  white: "#FFFFFF",
+};
