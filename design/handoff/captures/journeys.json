@@ -1,31 +1,32 @@
 {
  "j-topup": {
   "id": "j-topup",
-  "title": "Customer tops up the wallet",
-  "summary": "Alex adds UGX 75,000 to the LoadMaster wallet with Airtel Money. The demo approves instantly; the balance on Home updates and operations sees the top-up in the money ledger.",
+  "entry": 5,
+  "title": "Home entry 5 · Add funds",
+  "summary": "Entry point: Add funds on the Home wallet card. Alex adds UGX 75,000 to the LoadMaster wallet with Airtel Money. The demo approves instantly; the balance on Home updates and operations sees the top-up in the money ledger.",
   "big": true,
   "steps": [
    {
     "lane": "customer",
-    "label": "Home shows the wallet balance. Tap Add funds.",
+    "label": "Home · entry point. The wallet card shows the balance (the eye hides it) and Add funds. Next: tap Add funds.",
     "screen": "j-topup-01",
     "col": 0
    },
    {
     "lane": "customer",
-    "label": "The Add funds sheet opens with the current balance.",
+    "label": "Add funds sheet: wallet balance, amount, payment method (MTN, Airtel, demo card) and the demo outcome (Success, Pending, Failed). Next: enter an amount.",
     "screen": "j-topup-02",
     "col": 1
    },
    {
     "lane": "customer",
-    "label": "Enter the amount and choose Airtel Money.",
+    "label": "UGX 75,000 entered and Airtel Money chosen. Next: Approve demo top-up.",
     "screen": "j-topup-03",
     "col": 2
    },
    {
     "lane": "customer",
-    "label": "Approve the demo top-up: success confirmation.",
+    "label": "Top-up approved: success confirmation with the new balance.",
     "screen": "j-topup-04",
     "col": 3
    },
@@ -43,13 +44,13 @@
    },
    {
     "lane": "admin",
-    "label": "Transfers ledger lists the wallet top-up.",
+    "label": "Admin · Transfers ledger lists the wallet top-up.",
     "screen": "j-topup-06",
     "col": 6
    },
    {
     "lane": "admin",
-    "label": "Collections and reconciliation stay balanced.",
+    "label": "Admin · Collections and reconciliation stay balanced.",
     "screen": "j-topup-07",
     "col": 7
    }
@@ -115,6 +116,48 @@
     "label": "Enter UGX 150,000 and pick Airtel Money.",
     "screen": "j-payout-03",
     "col": 2
+   },
+   {
+    "lane": "driver",
+    "label": "Request withdrawal: confirmation.",
+    "screen": "j-payout-04",
+    "col": 3
+   },
+   {
+    "lane": "system",
+    "label": "POST /account/withdrawal · earnings moved to withdrawal clearing; request pending review",
+    "api": "POST /account/withdrawal",
+    "col": 4
+   },
+   {
+    "lane": "driver",
+    "label": "The request is listed under Your requests as pending.",
+    "screen": "j-payout-05",
+    "col": 5
+   },
+   {
+    "lane": "admin",
+    "label": "Driver payouts lists the new request.",
+    "screen": "j-payout-06",
+    "col": 6
+   },
+   {
+    "lane": "admin",
+    "label": "Review request: Approve for finance payment, with a reason for the audit trail.",
+    "screen": "j-payout-07",
+    "col": 7
+   },
+   {
+    "lane": "admin",
+    "label": "Save: the payout is approved for finance payment.",
+    "screen": "j-payout-08",
+    "col": 8
+   },
+   {
+    "lane": "driver",
+    "label": "Brian's payout request shows the new status.",
+    "screen": "j-payout-09",
+    "col": 9
    }
   ],
   "edges": [
@@ -126,6 +169,41 @@
    [
     1,
     2,
+    ""
+   ],
+   [
+    2,
+    3,
+    ""
+   ],
+   [
+    3,
+    4,
+    ""
+   ],
+   [
+    4,
+    5,
+    ""
+   ],
+   [
+    5,
+    6,
+    ""
+   ],
+   [
+    6,
+    7,
+    ""
+   ],
+   [
+    7,
+    8,
+    ""
+   ],
+   [
+    8,
+    9,
     ""
    ]
   ]
@@ -389,6 +467,1292 @@
    [
     3,
     4,
+    ""
+   ]
+  ]
+ },
+ "j-trip-reassign": {
+  "id": "j-trip-reassign",
+  "title": "Operations reassigns a trip to another driver",
+  "summary": "Brian has accepted Alex's trip but cannot make the pickup. Operations opens the trip, reassigns it to Grace with a reason, and both apps update: Brian's request is withdrawn and Alex sees the new driver.",
+  "big": true,
+  "steps": [
+   {
+    "lane": "admin",
+    "label": "Trips: find LM-35416699 (assigned to Brian).",
+    "screen": "j-trip-reassign-01",
+    "col": 0
+   },
+   {
+    "lane": "admin",
+    "label": "Open the trip page.",
+    "screen": "j-trip-reassign-02",
+    "col": 1
+   },
+   {
+    "lane": "admin",
+    "label": "Manage assignment: choose Grace and give a reason.",
+    "screen": "j-trip-reassign-03",
+    "col": 2
+   },
+   {
+    "lane": "admin",
+    "label": "Save: Grace is the assigned driver.",
+    "screen": "j-trip-reassign-04",
+    "col": 3
+   },
+   {
+    "lane": "admin",
+    "label": "Driver requests: Brian's acceptance withdrawn, Grace assigned by operations.",
+    "screen": "j-trip-reassign-05",
+    "col": 4
+   },
+   {
+    "lane": "driver",
+    "label": "Brian's Updates: the order was reassigned.",
+    "screen": "j-trip-reassign-06",
+    "col": 5
+   },
+   {
+    "lane": "customer",
+    "label": "Alex's order shows Grace as the driver.",
+    "screen": "j-trip-reassign-07",
+    "col": 6
+   }
+  ],
+  "edges": [
+   [
+    0,
+    1,
+    ""
+   ],
+   [
+    1,
+    2,
+    ""
+   ],
+   [
+    2,
+    3,
+    ""
+   ],
+   [
+    3,
+    4,
+    ""
+   ],
+   [
+    4,
+    5,
+    ""
+   ],
+   [
+    5,
+    6,
+    ""
+   ]
+  ]
+ },
+ "j-account-suspension": {
+  "id": "j-account-suspension",
+  "title": "Operations suspends and reactivates a driver",
+  "summary": "A driver account is suspended with a reason (signed out everywhere, no requests), the action is recorded in the audit trail, and the account is reactivated later.",
+  "big": true,
+  "steps": [
+   {
+    "lane": "admin",
+    "label": "Drivers: find Harriet.",
+    "screen": "j-account-suspension-01",
+    "col": 0
+   },
+   {
+    "lane": "admin",
+    "label": "Driver page.",
+    "screen": "j-account-suspension-02",
+    "col": 1
+   },
+   {
+    "lane": "admin",
+    "label": "More actions menu.",
+    "screen": "j-account-suspension-03",
+    "col": 2
+   },
+   {
+    "lane": "admin",
+    "label": "Suspend account: give a reason.",
+    "screen": "j-account-suspension-04",
+    "col": 3
+   },
+   {
+    "lane": "admin",
+    "label": "Save: Harriet is suspended.",
+    "screen": "j-account-suspension-05",
+    "col": 4
+   },
+   {
+    "lane": "admin",
+    "label": "Audit trail records who suspended her and why.",
+    "screen": "j-account-suspension-06",
+    "col": 5
+   },
+   {
+    "lane": "admin",
+    "label": "Back on the driver page: More › Reactivate account.",
+    "screen": "j-account-suspension-07",
+    "col": 6
+   },
+   {
+    "lane": "admin",
+    "label": "Save: Harriet is active again.",
+    "screen": "j-account-suspension-08",
+    "col": 7
+   }
+  ],
+  "edges": [
+   [
+    0,
+    1,
+    ""
+   ],
+   [
+    1,
+    2,
+    ""
+   ],
+   [
+    2,
+    3,
+    ""
+   ],
+   [
+    3,
+    4,
+    ""
+   ],
+   [
+    4,
+    5,
+    ""
+   ],
+   [
+    5,
+    6,
+    ""
+   ],
+   [
+    6,
+    7,
+    ""
+   ]
+  ]
+ },
+ "j-support-case": {
+  "id": "j-support-case",
+  "title": "Customer raises a support case and operations resolves it",
+  "summary": "Alex reports a problem from the customer app. Customer care finds the case, replies and marks it resolved; Alex sees the reply in Your support cases.",
+  "big": true,
+  "steps": [
+   {
+    "lane": "customer",
+    "label": "Account tab: Help & support.",
+    "screen": "j-support-case-01",
+    "col": 0
+   },
+   {
+    "lane": "customer",
+    "label": "Contact demo support: describe the issue.",
+    "screen": "j-support-case-02",
+    "col": 1
+   },
+   {
+    "lane": "customer",
+    "label": "Send support request: the case is recorded.",
+    "screen": "j-support-case-03",
+    "col": 2
+   },
+   {
+    "lane": "system",
+    "label": "POST /account/ticket · case created (open) and visible to operations",
+    "api": "POST /account/ticket",
+    "col": 3
+   },
+   {
+    "lane": "admin",
+    "label": "Support: the new open case.",
+    "screen": "j-support-case-04",
+    "col": 4
+   },
+   {
+    "lane": "admin",
+    "label": "Reply / resolve: write the reply and set Resolved.",
+    "screen": "j-support-case-05",
+    "col": 5
+   },
+   {
+    "lane": "admin",
+    "label": "Save: the case is resolved.",
+    "screen": "j-support-case-06",
+    "col": 6
+   },
+   {
+    "lane": "customer",
+    "label": "Your support cases: resolved, with the reply.",
+    "screen": "j-support-case-07",
+    "col": 7
+   }
+  ],
+  "edges": [
+   [
+    0,
+    1,
+    ""
+   ],
+   [
+    1,
+    2,
+    ""
+   ],
+   [
+    2,
+    3,
+    ""
+   ],
+   [
+    3,
+    4,
+    ""
+   ],
+   [
+    4,
+    5,
+    ""
+   ],
+   [
+    5,
+    6,
+    ""
+   ],
+   [
+    6,
+    7,
+    ""
+   ]
+  ]
+ },
+ "j-reconciliation": {
+  "id": "j-reconciliation",
+  "title": "Finance reconciles a provider settlement report",
+  "summary": "Finance imports the mobile-money provider's settlement report. LoadMaster compares every line with its own collections and lists matches, amount differences and unknown references for follow-up.",
+  "big": true,
+  "steps": [
+   {
+    "lane": "admin",
+    "label": "Reconciliation: earlier imports.",
+    "screen": "j-reconciliation-01",
+    "col": 0
+   },
+   {
+    "lane": "admin",
+    "label": "Import report: collections, paste the provider's CSV.",
+    "screen": "j-reconciliation-02",
+    "col": 1
+   },
+   {
+    "lane": "admin",
+    "label": "Compare records: matches, an amount difference and an unknown reference.",
+    "screen": "j-reconciliation-03",
+    "col": 2
+   },
+   {
+    "lane": "admin",
+    "label": "Open the import to see every line.",
+    "screen": "j-reconciliation-04",
+    "col": 3
+   }
+  ],
+  "edges": [
+   [
+    0,
+    1,
+    ""
+   ],
+   [
+    1,
+    2,
+    ""
+   ],
+   [
+    2,
+    3,
+    ""
+   ]
+  ]
+ },
+ "j-staff-invite": {
+  "id": "j-staff-invite",
+  "title": "Super Admin invites a staff member",
+  "summary": "Irene invites a new customer-care agent. The account is created with a temporary password that must be changed at first sign-in; the role decides which sections they see.",
+  "big": true,
+  "steps": [
+   {
+    "lane": "admin",
+    "label": "Staff & roles.",
+    "screen": "j-staff-invite-01",
+    "col": 0
+   },
+   {
+    "lane": "admin",
+    "label": "Invite staff: name, email, phone and role.",
+    "screen": "j-staff-invite-02",
+    "col": 1
+   },
+   {
+    "lane": "admin",
+    "label": "Save: the temporary password is shown once.",
+    "screen": "j-staff-invite-03",
+    "col": 2
+   },
+   {
+    "lane": "admin",
+    "label": "Ruth is listed with setup pending.",
+    "screen": "j-staff-invite-04",
+    "col": 3
+   }
+  ],
+  "edges": [
+   [
+    0,
+    1,
+    ""
+   ],
+   [
+    1,
+    2,
+    ""
+   ],
+   [
+    2,
+    3,
+    ""
+   ]
+  ]
+ },
+ "j-pricing": {
+  "id": "j-pricing",
+  "title": "Operations changes the driver response window",
+  "summary": "Settings › Edit pricing rules: the response window goes from 45 to 60 seconds with a reason; new requests to drivers use the new countdown.",
+  "big": true,
+  "steps": [
+   {
+    "lane": "admin",
+    "label": "Settings: pricing and dispatch rules.",
+    "screen": "j-pricing-01",
+    "col": 0
+   },
+   {
+    "lane": "admin",
+    "label": "Edit pricing rules: response window 60 seconds, with a reason.",
+    "screen": "j-pricing-02",
+    "col": 1
+   },
+   {
+    "lane": "admin",
+    "label": "Save: the new window applies to new requests.",
+    "screen": "j-pricing-03",
+    "col": 2
+   },
+   {
+    "lane": "admin",
+    "label": "The audit trail records the change.",
+    "screen": "j-pricing-04",
+    "col": 3
+   }
+  ],
+  "edges": [
+   [
+    0,
+    1,
+    ""
+   ],
+   [
+    1,
+    2,
+    ""
+   ],
+   [
+    2,
+    3,
+    ""
+   ]
+  ]
+ },
+ "j-home-order": {
+  "id": "j-home-order",
+  "entry": 1,
+  "title": "Home entry 1 · Order a cargo truck",
+  "summary": "Entry point: the green Order a cargo truck button on Home. Alex sets pickup and destination, picks a truck, adds cargo and contacts, chooses how to pay, reviews and places the order. LoadMaster offers it to eligible online drivers; Brian accepts in the driver app and Alex sees the assigned driver.",
+  "big": true,
+  "steps": [
+   {
+    "lane": "customer",
+    "label": "Home · entry point. The green Order a cargo truck button (“Set pickup and destination”) starts an immediate order. Next: tap it.",
+    "screen": "j-home-order-01",
+    "col": 0
+   },
+   {
+    "lane": "customer",
+    "label": "Locations: map with the pickup pin, “Where is the cargo?” and “Where is it going?” prefilled from saved places, plus recent destinations. Next: Continue.",
+    "screen": "j-home-order-02",
+    "col": 1
+   },
+   {
+    "lane": "customer",
+    "label": "Step 1 of 4 · Truck & destinations: the route, truck sizes (Pickup, Medium, Large), loading helpers at pickup, delivery stops (up to 5) and the estimated total. Next: choose a truck.",
+    "screen": "j-home-order-03",
+    "col": 2
+   },
+   {
+    "lane": "customer",
+    "label": "Medium truck selected (up to 3 tonnes, covered): the estimated total updates. Next: Cargo & contacts.",
+    "screen": "j-home-order-04",
+    "col": 3
+   },
+   {
+    "lane": "customer",
+    "label": "Step 2 of 4 · Cargo & contacts: sender (you by default or someone else), cargo items with weight against the truck payload, the recipient at each stop and an optional handover PIN. Next: Payment & pairing.",
+    "screen": "j-home-order-05",
+    "col": 4
+   },
+   {
+    "lane": "customer",
+    "label": "Step 3 of 4 · Payment & pairing: who pays (you, or the recipient after handover), the payment method and optional pairing with a known driver. Next: Review order.",
+    "screen": "j-home-order-06",
+    "col": 5
+   },
+   {
+    "lane": "customer",
+    "label": "Step 4 of 4 · Review your order: route, contacts, cargo, the fee breakdown, payer, method and matching. Tick the acknowledgement to enable Order a truck.",
+    "screen": "j-home-order-07",
+    "col": 6
+   },
+   {
+    "lane": "customer",
+    "label": "The acknowledgement is ticked; the total and Order a truck are ready at the bottom.",
+    "screen": "j-home-order-08",
+    "col": 7
+   },
+   {
+    "lane": "customer",
+    "label": "Order placed: confirmation with the order number; LoadMaster is finding a driver. Next: Track my order.",
+    "screen": "j-home-order-09",
+    "col": 8
+   },
+   {
+    "lane": "system",
+    "label": "POST /orders · order created as Finding a driver and offered to eligible online drivers, one at a time, each with a response countdown",
+    "api": "POST /orders",
+    "col": 9
+   },
+   {
+    "lane": "customer",
+    "label": "Order screen · Finding a driver: route map, stops, cargo, delivery progress, payment and Cancel order while the cargo is not collected.",
+    "screen": "j-home-order-10",
+    "col": 10
+   },
+   {
+    "lane": "driver",
+    "label": "Driver app · Brian taps Review request: pickup, stops, cargo, truck, his earning and the response countdown.",
+    "screen": "j-home-order-11",
+    "col": 11
+   },
+   {
+    "lane": "driver",
+    "label": "Driver app · Accept this order: the trip is Brian's and moves to his Deliveries.",
+    "screen": "j-home-order-12",
+    "col": 12
+   },
+   {
+    "lane": "customer",
+    "label": "Customer app · the order now shows Brian as the driver, his truck and the handover codes.",
+    "screen": "j-home-order-13",
+    "col": 13
+   },
+   {
+    "lane": "customer",
+    "label": "Messages & quick replies: chat with the assigned driver about this order, with one-tap quick replies.",
+    "screen": "j-home-order-14",
+    "col": 14
+   }
+  ],
+  "edges": [
+   [
+    0,
+    1,
+    ""
+   ],
+   [
+    1,
+    2,
+    ""
+   ],
+   [
+    2,
+    3,
+    ""
+   ],
+   [
+    3,
+    4,
+    ""
+   ],
+   [
+    4,
+    5,
+    ""
+   ],
+   [
+    5,
+    6,
+    ""
+   ],
+   [
+    6,
+    7,
+    ""
+   ],
+   [
+    7,
+    8,
+    ""
+   ],
+   [
+    8,
+    9,
+    ""
+   ],
+   [
+    9,
+    10,
+    ""
+   ],
+   [
+    10,
+    11,
+    ""
+   ],
+   [
+    11,
+    12,
+    ""
+   ],
+   [
+    12,
+    13,
+    ""
+   ],
+   [
+    13,
+    14,
+    ""
+   ]
+  ]
+ },
+ "j-home-schedule": {
+  "id": "j-home-schedule",
+  "entry": 2,
+  "title": "Home entry 2 · Schedule pickup",
+  "summary": "Entry point: the Schedule pickup tile on Home. Same order wizard as Order a cargo truck, with a pickup date and time chosen up front. The order is saved as scheduled and dispatched to drivers closer to the pickup time.",
+  "big": true,
+  "steps": [
+   {
+    "lane": "customer",
+    "label": "Home · entry point. The Schedule pickup tile (first of the three shortcuts) books a truck for later. Next: tap it.",
+    "screen": "j-home-schedule-01",
+    "col": 0
+   },
+   {
+    "lane": "customer",
+    "label": "Locations · “Schedule your pickup.”: pickup and destination plus Pickup date & time, with Change date and Change time. Next: Continue.",
+    "screen": "j-home-schedule-02",
+    "col": 1
+   },
+   {
+    "lane": "customer",
+    "label": "Step 1 of 4 · Truck & destinations for the scheduled trip: route, truck size, helpers, stops and estimate. Next: Cargo & contacts.",
+    "screen": "j-home-schedule-03",
+    "col": 2
+   },
+   {
+    "lane": "customer",
+    "label": "Step 2 of 4 · Cargo & contacts: sender (you by default or someone else), cargo items with weight against the truck payload, the recipient at each stop and an optional handover PIN. Next: Payment & pairing.",
+    "screen": "j-home-schedule-04",
+    "col": 3
+   },
+   {
+    "lane": "customer",
+    "label": "Step 3 of 4 · Payment & pairing: who pays (you, or the recipient after handover), the payment method and optional pairing with a known driver. Next: Review order.",
+    "screen": "j-home-schedule-05",
+    "col": 4
+   },
+   {
+    "lane": "customer",
+    "label": "Step 4 of 4 · Review your order: route, contacts, cargo, the fee breakdown, payer, method and matching. Tick the acknowledgement to enable Order a truck.",
+    "screen": "j-home-schedule-06",
+    "col": 5
+   },
+   {
+    "lane": "customer",
+    "label": "The acknowledgement is ticked; the total and Order a truck are ready at the bottom.",
+    "screen": "j-home-schedule-07",
+    "col": 6
+   },
+   {
+    "lane": "customer",
+    "label": "Pickup scheduled: the order number is booked and LoadMaster starts finding a driver before pickup. Next: Track my order.",
+    "screen": "j-home-schedule-08",
+    "col": 7
+   },
+   {
+    "lane": "system",
+    "label": "POST /orders (scheduledAt) · order saved as Scheduled; dispatch to drivers starts near the pickup time",
+    "api": "POST /orders",
+    "col": 8
+   },
+   {
+    "lane": "customer",
+    "label": "Order screen · Scheduled: the scheduled pickup date and time; eligible drivers receive the request when it is due.",
+    "screen": "j-home-schedule-09",
+    "col": 9
+   },
+   {
+    "lane": "customer",
+    "label": "Orders tab lists the trip as Scheduled.",
+    "screen": "j-home-schedule-10",
+    "col": 10
+   }
+  ],
+  "edges": [
+   [
+    0,
+    1,
+    ""
+   ],
+   [
+    1,
+    2,
+    ""
+   ],
+   [
+    2,
+    3,
+    ""
+   ],
+   [
+    3,
+    4,
+    ""
+   ],
+   [
+    4,
+    5,
+    ""
+   ],
+   [
+    5,
+    6,
+    ""
+   ],
+   [
+    6,
+    7,
+    ""
+   ],
+   [
+    7,
+    8,
+    ""
+   ],
+   [
+    8,
+    9,
+    ""
+   ],
+   [
+    9,
+    10,
+    ""
+   ]
+  ]
+ },
+ "j-home-repeat": {
+  "id": "j-home-repeat",
+  "entry": 3,
+  "title": "Home entry 3 · Order again",
+  "summary": "Entry point: the Order again tile on Home. Alex picks a past trip; its route, cargo and contacts are copied into the order wizard to review and edit, and a fresh price is calculated before ordering.",
+  "big": true,
+  "steps": [
+   {
+    "lane": "customer",
+    "label": "Home · entry point. The Order again tile (middle shortcut) repeats a past trip. Next: tap it.",
+    "screen": "j-home-repeat-01",
+    "col": 0
+   },
+   {
+    "lane": "customer",
+    "label": "Order again: completed, returned and cancelled trips, newest first, each with route, date, status and price. Next: choose a trip.",
+    "screen": "j-home-repeat-02",
+    "col": 1
+   },
+   {
+    "lane": "customer",
+    "label": "A delivered trip is chosen: Locations opens prefilled with its pickup and destination. Next: Continue.",
+    "screen": "j-home-repeat-03",
+    "col": 2
+   },
+   {
+    "lane": "customer",
+    "label": "Step 1 of 4 · the past trip's truck, loading helpers and stops are preselected; a fresh estimate is shown. Next: Cargo & contacts.",
+    "screen": "j-home-repeat-04",
+    "col": 3
+   },
+   {
+    "lane": "customer",
+    "label": "Step 2 of 4 · cargo items, sender and recipients copied from the past trip, ready to edit. Next: Payment & pairing.",
+    "screen": "j-home-repeat-05",
+    "col": 4
+   },
+   {
+    "lane": "customer",
+    "label": "Step 3 of 4 · the past trip's payment method is preselected. Next: Review order.",
+    "screen": "j-home-repeat-06",
+    "col": 5
+   },
+   {
+    "lane": "customer",
+    "label": "Step 4 of 4 · Review your order: route, contacts, cargo, the fee breakdown, payer, method and matching. Tick the acknowledgement to enable Order a truck.",
+    "screen": "j-home-repeat-07",
+    "col": 6
+   },
+   {
+    "lane": "customer",
+    "label": "The acknowledgement is ticked; the total and Order a truck are ready at the bottom.",
+    "screen": "j-home-repeat-08",
+    "col": 7
+   },
+   {
+    "lane": "customer",
+    "label": "Order placed: confirmation with the new order number. Next: Track my order.",
+    "screen": "j-home-repeat-09",
+    "col": 8
+   },
+   {
+    "lane": "system",
+    "label": "POST /orders · a new order with a fresh quote; the past trip is unchanged",
+    "api": "POST /orders",
+    "col": 9
+   },
+   {
+    "lane": "customer",
+    "label": "Order screen · Finding a driver for the repeated trip.",
+    "screen": "j-home-repeat-10",
+    "col": 10
+   }
+  ],
+  "edges": [
+   [
+    0,
+    1,
+    ""
+   ],
+   [
+    1,
+    2,
+    ""
+   ],
+   [
+    2,
+    3,
+    ""
+   ],
+   [
+    3,
+    4,
+    ""
+   ],
+   [
+    4,
+    5,
+    ""
+   ],
+   [
+    5,
+    6,
+    ""
+   ],
+   [
+    6,
+    7,
+    ""
+   ],
+   [
+    7,
+    8,
+    ""
+   ],
+   [
+    8,
+    9,
+    ""
+   ],
+   [
+    9,
+    10,
+    ""
+   ]
+  ]
+ },
+ "j-home-driver-id": {
+  "id": "j-home-driver-id",
+  "entry": 4,
+  "title": "Home entry 4 · Use a driver ID",
+  "summary": "Entry point: the Use a driver ID tile on Home. Alex enters a driver's short number (Brian is 2001). LoadMaster checks the driver is verified, online, free and has a big enough truck, then the order goes to that driver first; Brian accepts and is assigned.",
+  "big": true,
+  "steps": [
+   {
+    "lane": "customer",
+    "label": "Home · entry point. The Use a driver ID tile (third shortcut) sends an order straight to a driver you know. Next: tap it.",
+    "screen": "j-home-driver-id-01",
+    "col": 0
+   },
+   {
+    "lane": "customer",
+    "label": "Use a driver ID: Driver number or ID field; the order goes to this driver for acceptance. Next: enter the number.",
+    "screen": "j-home-driver-id-02",
+    "col": 1
+   },
+   {
+    "lane": "customer",
+    "label": "Unknown number: “Check the driver's short number.” Nothing is sent until a valid driver is found.",
+    "screen": "j-home-driver-id-03",
+    "col": 2
+   },
+   {
+    "lane": "system",
+    "label": "POST /account/pair · resolves the short number; refuses drivers who are offline, busy, unverified or whose truck is too small (8 attempts a minute)",
+    "api": "POST /account/pair",
+    "col": 3
+   },
+   {
+    "lane": "customer",
+    "label": "Brian (2001) is available: Locations opens with his truck size carried over. Next: Continue.",
+    "screen": "j-home-driver-id-04",
+    "col": 4
+   },
+   {
+    "lane": "customer",
+    "label": "Step 1 of 4 · Truck & destinations, preset to Brian's truck size. Next: Cargo & contacts.",
+    "screen": "j-home-driver-id-05",
+    "col": 5
+   },
+   {
+    "lane": "customer",
+    "label": "Step 2 of 4 · Cargo & contacts: sender (you by default or someone else), cargo items with weight against the truck payload, the recipient at each stop and an optional handover PIN. Next: Payment & pairing.",
+    "screen": "j-home-driver-id-06",
+    "col": 6
+   },
+   {
+    "lane": "customer",
+    "label": "Step 3 of 4 · Your matched driver: Brian Kato with his truck and plate, awaiting his consent after ordering. Use automatic matching switches back. Next: Review order.",
+    "screen": "j-home-driver-id-07",
+    "col": 7
+   },
+   {
+    "lane": "customer",
+    "label": "Step 4 of 4 · Review your order shows “Pair with Brian Kato” as matching. Tick the acknowledgement.",
+    "screen": "j-home-driver-id-08",
+    "col": 8
+   },
+   {
+    "lane": "customer",
+    "label": "The acknowledgement is ticked; the total and Order a truck are ready at the bottom.",
+    "screen": "j-home-driver-id-09",
+    "col": 9
+   },
+   {
+    "lane": "customer",
+    "label": "Order placed. Next: Track my order.",
+    "screen": "j-home-driver-id-10",
+    "col": 10
+   },
+   {
+    "lane": "customer",
+    "label": "Order screen · Awaiting your paired driver: only Brian is asked; Search other eligible drivers falls back to automatic matching.",
+    "screen": "j-home-driver-id-11",
+    "col": 11
+   },
+   {
+    "lane": "driver",
+    "label": "Driver app · Brian's request is marked as paired to him. Review request shows the trip and countdown.",
+    "screen": "j-home-driver-id-12",
+    "col": 12
+   },
+   {
+    "lane": "driver",
+    "label": "Driver app · Accept this order.",
+    "screen": "j-home-driver-id-13",
+    "col": 13
+   },
+   {
+    "lane": "customer",
+    "label": "Customer app · Brian is the assigned driver.",
+    "screen": "j-home-driver-id-14",
+    "col": 14
+   }
+  ],
+  "edges": [
+   [
+    0,
+    1,
+    ""
+   ],
+   [
+    1,
+    2,
+    ""
+   ],
+   [
+    2,
+    3,
+    ""
+   ],
+   [
+    3,
+    4,
+    ""
+   ],
+   [
+    4,
+    5,
+    ""
+   ],
+   [
+    5,
+    6,
+    ""
+   ],
+   [
+    6,
+    7,
+    ""
+   ],
+   [
+    7,
+    8,
+    ""
+   ],
+   [
+    8,
+    9,
+    ""
+   ],
+   [
+    9,
+    10,
+    ""
+   ],
+   [
+    10,
+    11,
+    ""
+   ],
+   [
+    11,
+    12,
+    ""
+   ],
+   [
+    12,
+    13,
+    ""
+   ],
+   [
+    13,
+    14,
+    ""
+   ]
+  ]
+ },
+ "j-home-loyalty": {
+  "id": "j-home-loyalty",
+  "entry": 6,
+  "title": "Home entry 6 · Loyalty rewards",
+  "summary": "Entry point: the Loyalty & referral rewards banner on Home. Alex reads how loyalty rewards work. Finance then gives Alex a cashback for a completed trip; it is paid into the LoadMaster wallet, listed under Referrals & rewards and can be spent by choosing LoadMaster wallet at payment.",
+  "big": true,
+  "steps": [
+   {
+    "lane": "customer",
+    "label": "Home · entry point. The Loyalty & referral rewards banner at the bottom of Home. Next: tap it.",
+    "screen": "j-home-loyalty-01",
+    "col": 0
+   },
+   {
+    "lane": "customer",
+    "label": "Offer card · “More value with LoadMaster”: approved referral and cashback rewards are credited to the LoadMaster wallet and used by choosing LoadMaster wallet at payment. Next: Got it.",
+    "screen": "j-home-loyalty-02",
+    "col": 1
+   },
+   {
+    "lane": "customer",
+    "label": "Back on Home.",
+    "screen": "j-home-loyalty-03",
+    "col": 2
+   },
+   {
+    "lane": "admin",
+    "label": "Admin · Referrals & cashbacks: every reward with status.",
+    "screen": "j-home-loyalty-04",
+    "col": 3
+   },
+   {
+    "lane": "admin",
+    "label": "Admin · New reward: Alex, Customer cashback, the completed trip, UGX 5,000 and a reason.",
+    "screen": "j-home-loyalty-05",
+    "col": 4
+   },
+   {
+    "lane": "admin",
+    "label": "Admin · Saved: the cashback is pending.",
+    "screen": "j-home-loyalty-06",
+    "col": 5
+   },
+   {
+    "lane": "admin",
+    "label": "Admin · Pay reward: confirm with a note.",
+    "screen": "j-home-loyalty-07",
+    "col": 6
+   },
+   {
+    "lane": "admin",
+    "label": "Admin · Paid: the cashback is credited to Alex's wallet.",
+    "screen": "j-home-loyalty-08",
+    "col": 7
+   },
+   {
+    "lane": "system",
+    "label": "POST /admin/reward · reward posted to the ledger (customer wallet ← platform)",
+    "api": "POST /admin/reward",
+    "col": 8
+   },
+   {
+    "lane": "customer",
+    "label": "Customer · Account › Referrals & rewards lists the new Customer cashback as paid, with its reason.",
+    "screen": "j-home-loyalty-09",
+    "col": 9
+   },
+   {
+    "lane": "customer",
+    "label": "Customer · Home: the wallet balance includes the cashback.",
+    "screen": "j-home-loyalty-10",
+    "col": 10
+   },
+   {
+    "lane": "customer",
+    "label": "Using it: at Step 3 · Payment, choose LoadMaster wallet to pay from the balance.",
+    "screen": "j-home-loyalty-11",
+    "col": 11
+   }
+  ],
+  "edges": [
+   [
+    0,
+    1,
+    ""
+   ],
+   [
+    1,
+    2,
+    ""
+   ],
+   [
+    2,
+    3,
+    ""
+   ],
+   [
+    3,
+    4,
+    ""
+   ],
+   [
+    4,
+    5,
+    ""
+   ],
+   [
+    5,
+    6,
+    ""
+   ],
+   [
+    6,
+    7,
+    ""
+   ],
+   [
+    7,
+    8,
+    ""
+   ],
+   [
+    8,
+    9,
+    ""
+   ],
+   [
+    9,
+    10,
+    ""
+   ],
+   [
+    10,
+    11,
+    ""
+   ]
+  ]
+ },
+ "j-home-referral": {
+  "id": "j-home-referral",
+  "entry": 7,
+  "title": "Home entry 7 · Referral",
+  "summary": "Entry point: the Loyalty & referral rewards banner, then Account › Referrals & rewards. Alex shares a personal referral code. When the referred friend completes a trip, operations records a referral bonus and pays it into Alex's LoadMaster wallet.",
+  "big": true,
+  "steps": [
+   {
+    "lane": "customer",
+    "label": "Home · entry point. Loyalty & referral rewards banner; referrals are managed from Account. Next: Account tab.",
+    "screen": "j-home-referral-01",
+    "col": 0
+   },
+   {
+    "lane": "customer",
+    "label": "Account › More account options lists Referrals & rewards. Next: tap it.",
+    "screen": "j-home-referral-02",
+    "col": 1
+   },
+   {
+    "lane": "customer",
+    "label": "Referrals & rewards · “A good move is worth sharing.”: Alex's referral code, Preview loyalty offer card, Share referral code and past reward records.",
+    "screen": "j-home-referral-03",
+    "col": 2
+   },
+   {
+    "lane": "system",
+    "label": "Share referral code opens the phone's share sheet with “My LoadMaster demo referral code is LM-…”. The friend signs up and completes a trip.",
+    "col": 3
+   },
+   {
+    "lane": "admin",
+    "label": "Admin · Referrals & cashbacks.",
+    "screen": "j-home-referral-04",
+    "col": 4
+   },
+   {
+    "lane": "admin",
+    "label": "Admin · New reward: Alex, Referral bonus, the qualifying completed trip, UGX 10,000 and a reason.",
+    "screen": "j-home-referral-05",
+    "col": 5
+   },
+   {
+    "lane": "admin",
+    "label": "Admin · Saved: the referral bonus is pending.",
+    "screen": "j-home-referral-06",
+    "col": 6
+   },
+   {
+    "lane": "customer",
+    "label": "Customer · Referrals & rewards: the referral bonus shows as pending.",
+    "screen": "j-home-referral-07",
+    "col": 7
+   },
+   {
+    "lane": "admin",
+    "label": "Admin · Pay reward: confirm with a note.",
+    "screen": "j-home-referral-08",
+    "col": 8
+   },
+   {
+    "lane": "admin",
+    "label": "Admin · Paid into Alex's wallet.",
+    "screen": "j-home-referral-09",
+    "col": 9
+   },
+   {
+    "lane": "customer",
+    "label": "Customer · Referrals & rewards: the referral bonus is paid.",
+    "screen": "j-home-referral-10",
+    "col": 10
+   },
+   {
+    "lane": "customer",
+    "label": "Customer · Home: the wallet balance includes the bonus.",
+    "screen": "j-home-referral-11",
+    "col": 11
+   }
+  ],
+  "edges": [
+   [
+    0,
+    1,
+    ""
+   ],
+   [
+    1,
+    2,
+    ""
+   ],
+   [
+    2,
+    3,
+    ""
+   ],
+   [
+    3,
+    4,
+    ""
+   ],
+   [
+    4,
+    5,
+    ""
+   ],
+   [
+    5,
+    6,
+    ""
+   ],
+   [
+    6,
+    7,
+    ""
+   ],
+   [
+    7,
+    8,
+    ""
+   ],
+   [
+    8,
+    9,
+    ""
+   ],
+   [
+    9,
+    10,
+    ""
+   ],
+   [
+    10,
+    11,
     ""
    ]
   ]

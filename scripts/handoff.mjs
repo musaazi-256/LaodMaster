@@ -8,6 +8,7 @@ import { fileURLToPath } from "node:url";
 import { deflateRawSync } from "node:zlib";
 import ts from "typescript";
 import { spec as source, icons } from "../design/handoff/spec.mjs";
+import { SCREENS } from "./capture/screens.mjs";
 
 const root = fileURLToPath(new URL("..", import.meta.url));
 const read = (p) => readFileSync(root + p, "utf8");
@@ -43,7 +44,11 @@ export function validate(spec = buildSpec()) {
   const stackRoutes = new Set(
     [...nav.matchAll(/^\s{2}(\w+):/gm)].map((m) => m[1]),
   );
-  const tabs = read("packages/mobile/src/Tabs.tsx");
+  // Tabs.tsx may re-export the bar from LabeledTabs.tsx, so check both.
+  const tabs = ["Tabs.tsx", "LabeledTabs.tsx"]
+    .filter((f) => existsSync(root + "packages/mobile/src/" + f))
+    .map((f) => read("packages/mobile/src/" + f))
+    .join("\n");
   const contracts = read("packages/contracts/src/index.ts");
   const stages = new Set(
     [
@@ -236,15 +241,36 @@ export function build() {
   // in a second file, so the plugin can rebuild them exactly.
   const capDir = root + "design/handoff/captures/";
   const ids = new Set(spec.apps.flatMap((a) => a.sections.flatMap((s) => s.screens.map((x) => x.id))));
+  // Documented journeys (scripts/capture/journeys.mjs) lead the flows page: the
+  // Home entry-point journeys first, in entry order, then the rest as captured.
+  const journeys = (existsSync(capDir + "journeys.json") ? Object.values(JSON.parse(read("design/handoff/captures/journeys.json"))) : [])
+    .map((j, i) => [j, i])
+    .sort(([a, i], [b, k]) => (a.entry ?? 1e9) - (b.entry ?? 1e9) || i - k)
+    .map(([j]) => j);
+  // Only the step captures a current journey uses (old or shortened journeys leave files behind).
+  const steps = new Set(journeys.flatMap((j) => j.steps.map((s) => s.screen).filter(Boolean)));
   const captures = {};
   if (existsSync(capDir))
-    for (const f of readdirSync(capDir))
-      if (f.endsWith(".json") && (ids.has(f.slice(0, -5)) || /^(j|auto)-/.test(f))) captures[f.slice(0, -5)] = JSON.parse(read("design/handoff/captures/" + f));
-  // Documented journeys (scripts/capture/journeys.mjs) lead the flows page.
-  const journeys = existsSync(capDir + "journeys.json") ? Object.values(JSON.parse(read("design/handoff/captures/journeys.json"))) : [];
+    for (const f of readdirSync(capDir)) {
+      const id = f.slice(0, -5);
+      if (f.endsWith(".json") && (ids.has(id) || steps.has(id) || id.startsWith("auto-") || SCREENS.some((x) => x.doc && x.id === id))) captures[id] = JSON.parse(read("design/handoff/captures/" + f));
+    }
   // Screens found in the code but missing from spec.mjs (scripts/capture/discover.mjs).
   const found = existsSync(capDir + "auto.json") ? JSON.parse(read("design/handoff/captures/auto.json")).filter((x) => captures[x.id]) : [];
-  const apps = spec.apps.map((a) => {
+  // States documented only by their capture recipe (scripts/capture/screens.mjs
+  // `doc`): every dialog, tab and menu, placed in their app section.
+  const documented = SCREENS.filter((x) => x.doc && captures[x.id]);
+  const apps = spec.apps.map((a0) => {
+    const mine = documented.filter((x) => x.app.key.split("-")[0] === a0.id);
+    const a = !mine.length
+      ? a0
+      : {
+          ...a0,
+          sections: a0.sections.map((sec) => ({
+            ...sec,
+            screens: [...sec.screens, ...mine.filter((x) => x.doc.section === sec.section).map((x) => ({ id: x.id, name: x.doc.name, route: x.doc.route, purpose: x.doc.purpose }))],
+          })),
+        };
     const extra = found.filter((x) => x.app === a.id);
     if (!extra.length) return a;
     const screens = extra.map((x) => ({ id: x.id, name: x.name, route: x.route, tag: "New", purpose: "Found in the code by npm run capture; not yet described in design/handoff/spec.mjs." }));

@@ -8,8 +8,9 @@ import {
 import { useDemo } from "./state";
 import { C, type IconName } from "./ui";
 import { Home } from "./Home";
-import { Orders, Earnings, Payments } from "./Lists";
+import { Orders, Earnings } from "./Lists";
 import { Account } from "./Account";
+import { LabeledTabs } from "./LabeledTabs";
 const Tab = createNativeBottomTabNavigator();
 const icons: Record<string, IconName> = {
   Home: "home-outline",
@@ -29,6 +30,10 @@ const symbols: Record<string, string> = {
 };
 export function Tabs() {
   const { role } = useDemo();
+  return role === "customer" ? <LabeledTabs /> : <DriverTabs />;
+}
+
+function DriverTabs() {
   const [images, setImages] = useState<Record<string, ImageSourcePropType>>({});
   useEffect(() => {
     if (Platform.OS === "android")
@@ -48,7 +53,6 @@ export function Tabs() {
         )
         .catch(() => {});
   }, []);
-  const driver = role === "driver";
   return (
     <Tab.Navigator
       backBehavior="history"
@@ -68,11 +72,8 @@ export function Tabs() {
       })}
     >
       <Tab.Screen name="Home" component={Home} />
-      <Tab.Screen name={driver ? "Deliveries" : "Orders"} component={Orders} />
-      <Tab.Screen
-        name={driver ? "Earnings" : "Payments"}
-        component={driver ? Earnings : Payments}
-      />
+      <Tab.Screen name="Deliveries" component={Orders} />
+      <Tab.Screen name="Earnings" component={Earnings} />
       <Tab.Screen name="Account" component={Account} />
     </Tab.Navigator>
   );

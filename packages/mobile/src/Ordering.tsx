@@ -231,19 +231,37 @@ export function Locations({
             accessibilityRole="button"
             accessibilityLabel="Back"
             onPress={() => navigation.goBack()}
-            hitSlop={6}
             style={locationStyles.mapButton}
           >
-            <FigmaIcon name="order-lucide-icons-arrow-left" />
+            <View
+              pointerEvents="none"
+              style={[
+                locationStyles.mapButtonSurface,
+                locationStyles.mapBackSurface,
+              ]}
+            >
+              <View style={locationStyles.mapButtonIcon}>
+                <FigmaIcon name="order-map-back" />
+              </View>
+            </View>
           </Pressable>
           <Pressable
             accessibilityRole="button"
             accessibilityLabel="Use my current location"
             onPress={() => void findLocation(true, "pickup")}
-            hitSlop={6}
             style={locationStyles.mapButton}
           >
-            <FigmaIcon name="order-lucide-icons-navigation" />
+            <View
+              pointerEvents="none"
+              style={[
+                locationStyles.mapButtonSurface,
+                locationStyles.mapLocationSurface,
+              ]}
+            >
+              <View style={locationStyles.mapButtonIcon}>
+                <FigmaIcon name="order-map-current-location" />
+              </View>
+            </View>
           </Pressable>
         </View>
       </View>
@@ -538,17 +556,28 @@ const locationStyles = StyleSheet.create({
   mapButton: {
     height: metrics.touch,
     width: metrics.touch,
-    borderRadius: 21,
-    borderWidth: 0.5,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  mapButtonSurface: {
+    width: 32,
+    height: 32,
+    borderRadius: 15,
     borderColor: "#E2E8F0",
     backgroundColor: "white",
     alignItems: "center",
     justifyContent: "center",
-    shadowColor: "#000",
-    shadowOpacity: 0.14,
-    shadowRadius: 8,
-    shadowOffset: { width: 0, height: 4 },
-    elevation: 5,
+  },
+  mapButtonIcon: { transform: [{ scale: 1.15 }] },
+  mapBackSurface: {
+    borderWidth: 0.5,
+    boxShadow: "0px 2.333px 2px rgba(0, 0, 0, 0.14)",
+  },
+  mapLocationSurface: {
+    borderWidth: 0.583,
+    paddingRight: 0.583,
+    paddingBottom: 0.583,
+    boxShadow: "0px 2.333px 2.333px rgba(0, 0, 0, 0.14)",
   },
   sheet: {
     paddingTop: 12,

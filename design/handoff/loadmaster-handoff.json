@@ -314,9 +314,7 @@
                 },
                 {
                   "t": "carousel",
-                  "pill": "Everyday cargo",
-                  "title": "A truck for\nevery load",
-                  "body": "From pickup to delivery,\nkeep every load in sight."
+                  "title": "A truck for\nevery load"
                 },
                 {
                   "t": "ctabar",
@@ -327,10 +325,9 @@
                 {
                   "t": "tiles",
                   "items": [
-                    "Schedule\npickup",
+                    "Schedule pickup",
                     "Order again",
-                    "Choose\na truck",
-                    "Match a\ndriver"
+                    "Match a driver"
                   ]
                 },
                 {
@@ -343,11 +340,6 @@
                   "t": "section",
                   "text": "Recent activity",
                   "link": "View all →"
-                },
-                {
-                  "t": "empty",
-                  "title": "Your first move starts here",
-                  "body": "Your orders and delivery updates will appear here."
                 }
               ],
               "actions": [
@@ -410,17 +402,6 @@
                   "t": "section",
                   "text": "Recent activity",
                   "link": "View all →"
-                },
-                {
-                  "t": "list",
-                  "items": [
-                    {
-                      "title": "LM-1EA1A628",
-                      "sub": "Ntinda Shopping Centre → Acacia Mall",
-                      "badge": "ON THE WAY",
-                      "tone": "green"
-                    }
-                  ]
                 }
               ],
               "notes": [
@@ -8179,5 +8160,5 @@
     "dot": "<circle cx=\"12\" cy=\"12\" r=\"5\" fill=\"C\"/>",
     "ring": "<circle cx=\"12\" cy=\"12\" r=\"6\"/>"
   },
-  "generatedAt": "2026-11-12T17:35:39.139Z"
+  "generatedAt": "2026-11-18T11:29:28.637Z"
 }

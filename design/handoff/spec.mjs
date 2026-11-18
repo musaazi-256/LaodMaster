@@ -153,12 +153,11 @@ const customer = [
         purpose: "Customer landing screen (CustomerHome). Starts an order, quick actions, wallet and recent activity.",
         blocks: [
           { t: "greet2", brand: "LoadMaster", hello: "Hello, Alex 👋", title: "What are we moving today?" },
-          { t: "carousel", pill: "Everyday cargo", title: "A truck for\nevery load", body: "From pickup to delivery,\nkeep every load in sight." },
+          { t: "carousel", title: "A truck for\nevery load" },
           { t: "ctabar", title: "Order a cargo truck", sub: "Set pickup and destination", icon: "pin" },
-          { t: "tiles", items: ["Schedule\npickup", "Order again", "Choose\na truck", "Match a\ndriver"] },
+          { t: "tiles", items: ["Schedule pickup", "Order again", "Match a driver"] },
           { t: "wallet", label: "Wallet balance", value: "UGX 0", cta: "Add funds" },
           { t: "section", text: "Recent activity", link: "View all →" },
-          empty("Your first move starts here", "Your orders and delivery updates will appear here."),
         ],
         actions: [
           act("Order a cargo truck", "—", "Opens the 4-step order wizard (ChooseTruck → CargoOrderWizard)."),
@@ -180,7 +179,6 @@ const customer = [
           banner("Payment needs your attention · LM-22B8E004", "amber"),
           { t: "wallet", label: "Wallet balance", value: "UGX ••••••", cta: "Add funds" },
           { t: "section", text: "Recent activity", link: "View all →" },
-          { t: "list", items: [{ title: "LM-1EA1A628", sub: `${ROUTE[0]} → ${STOPS[1]}`, badge: "ON THE WAY", tone: "green" }] },
         ],
         notes: ["Driver stage changes made in the Driver app appear here within one poll (≈2 s)."],
       },

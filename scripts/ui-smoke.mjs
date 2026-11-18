@@ -62,6 +62,16 @@ try {
     "driver",
     Number(process.env.DRIVER_PORT || 8092),
   );
+  const bookingButton = customer.getByRole("button", {
+    name: "Order a cargo truck",
+    exact: true,
+  });
+  await expect(bookingButton).toBeInViewport({ ratio: 1 });
+  const bookingBounds = await bookingButton.boundingBox();
+  const artworkBounds = await customer
+    .getByText("A truck for", { exact: false })
+    .boundingBox();
+  expect(bookingBounds.y + bookingBounds.height).toBeLessThan(artworkBounds.y);
   await customer.screenshot({ path: out + "/customer-home.png" });
   await expect(
     customer.getByRole("button", { name: "Previous artwork", exact: true }),
@@ -112,22 +122,7 @@ try {
   ).toBeVisible();
   await customer.getByRole("button", { name: "Back", exact: true }).click();
   await customer
-    .getByRole("button", { name: "Choose a truck", exact: true })
-    .click();
-  await customer.getByRole("radio").last().click();
-  await customer
-    .getByRole("button", { name: "Continue to locations", exact: true })
-    .click();
-  await expect(
-    customer.getByRole("button", {
-      name: "Choose pickup location",
-      exact: true,
-    }),
-  ).toBeVisible();
-  await customer.getByRole("button", { name: "Back", exact: true }).click();
-  await customer.getByRole("button", { name: "Back", exact: true }).click();
-  await customer
-    .getByRole("button", { name: "Match a driver", exact: true })
+    .getByRole("button", { name: "Use a driver ID", exact: true })
     .click();
   await customer
     .getByLabel("Driver number or ID", { exact: true })
@@ -366,9 +361,12 @@ try {
   ).toBeVisible();
   await customer.screenshot({ path: out + "/payment-receipt.png" });
   await customer.reload();
-  await customer.getByText("Hello, Alex", { exact: false }).waitFor();
+  await customer.getByText(/^Good (morning|afternoon|evening), Alex/).waitFor();
   await expect(
     customer.getByText("Recent activity", { exact: true }),
+  ).toHaveCount(0);
+  await expect(
+    customer.getByRole("button", { name: "View loyalty rewards offer" }),
   ).toBeVisible();
   await customer
     .getByRole("button", { name: "Order again", exact: true })

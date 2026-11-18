@@ -6,15 +6,16 @@ const demoLogin = async (page) => {
   await page.getByText("Explore with a demo account").first().click();
   await page.waitForTimeout(3500);
 };
-const staffLogin = async (page) => {
+const staffLoginAs = (identifier) => async (page) => {
   const r = await fetch("http://localhost:4000/auth/login", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ identifier: "irene@loadmaster.test", password: "DemoCargo2026!", role: "staff" }),
+    body: JSON.stringify({ identifier, password: "DemoCargo2026!", role: "staff" }),
   });
   const { token } = await r.json();
   await page.evaluate((t) => localStorage.setItem("loadmaster-admin-token", t), token);
 };
+const staffLogin = staffLoginAs("irene@loadmaster.test");
 
 export const APPS = {
   customer: { key: "customer", kind: "mobile", url: "http://localhost:8191", login: demoLogin },
@@ -71,6 +72,75 @@ const tripPage = (tabName) => ({ steps: [async (p) => p.goto("http://localhost:4
 const W = (n) => [go("Continue", 2500), ...["Cargo & contacts", "Payment & pairing", "Review order"].slice(0, n - 1).map((t) => go(t, 2500))];
 const banner = go("Review request", 2500);
 
+// Every other admin state: tabs, dialogs, menus and confirmations, plus each
+// staff role's view. `doc` places the capture in the Figma admin page; these are
+// captured-only (no hand-drawn fallback in spec.mjs).
+const role = (email) => ({ ...A, key: "admin-" + email.split("@")[0], login: staffLoginAs(email) });
+const BRIAN = "/drivers/driver-1";
+const more = (item) => [{ button: "More actions" }, { menu: item }];
+const st = (id, section, name, route, purpose, path, steps = [], extra = {}) => ({ id, app: A, path, steps, doc: { section, name, route, purpose }, ...extra });
+const ADMIN_STATES = [
+  // Access
+  st("a-login-error", "Access", "Staff sign in · wrong password", "/operations (login)", "A wrong password keeps the form and shows the server's error under it.", "", [{ type: "not-the-password", nth: 1 }, { button: "Sign in" }], { signedOut: true }),
+  st("a-login-recover", "Access", "Forgot password", "/operations (login › recover)", "Enter the staff email or phone to get a one-time code.", "", [{ button: "Forgot your password?" }], { signedOut: true }),
+  st("a-login-code", "Access", "Reset password · code", "/operations (login › code)", "The demo shows the code; staff enter it with a new password.", "", [{ button: "Forgot your password?" }, { button: "Continue", wait: 1500 }], { signedOut: true }),
+  // Workspace
+  st("a-my-profile", "Workspace", "My staff profile", "header › profile", "Opened from the name in the header: role, status, contact details and recent activity.", "/dashboard", [{ label: "View my staff profile" }]),
+  st("a-my-profile-edit", "Workspace", "Edit my name & phone", "header › profile › edit", "Staff update their own name and phone.", "/dashboard", [{ label: "View my staff profile" }, { button: "Edit my name & phone" }]),
+  st("a-my-password", "Workspace", "Change my password", "header › profile › password", "Current and new password; other sessions are signed out.", "/dashboard", [{ label: "View my staff profile" }, { button: "Change password" }]),
+  st("a-trips-columns", "Workspace", "Trips · choose columns", "trips (columns menu)", "Every table can hide columns; the choice is remembered per table.", "/trips", [{ label: "Choose columns" }]),
+  st("a-trip-issues", "Workspace", "Trip page · issues", "trips (page › Issues)", "Issues reported on a trip by the customer or driver, with replies.", "/trips/LM-7614E75B", [{ tab: /^Issues/ }]),
+  st("a-trip-issue-reply", "Workspace", "Respond to trip issue", "trips (page › Issues › reply)", "Reply to the reporter and set the case status.", "/trips/LM-7614E75B", [{ tab: /^Issues/ }, { button: "Reply or resolve" }]),
+  ...[["admin", "daniel", "Admin"], ["lead", "rita", "Team Lead"], ["agent", "peter", "Field Agent"], ["care", "joan", "Customer Care"]].map(([k, who, name]) =>
+    st("a-view-" + k, "Workspace", "Signed in as " + name, "dashboard (" + name + ")", "What the " + name + " role sees: sections and actions without permission are not rendered at all.", "/dashboard", [], { app: role(who + "@loadmaster.test") }),
+  ),
+  // People & fleet
+  st("a-driver-add", "People & fleet", "Add driver", "drivers (form dialog)", "Operations registers a driver; they set a password at first sign-in.", "/drivers", [{ button: /Add driver/ }]),
+  st("a-customer-add", "People & fleet", "Add customer", "customers (form dialog)", "Operations registers a customer account.", "/customers", [{ button: /Add customer/ }]),
+  st("a-driver-transactions", "People & fleet", "Driver page · transactions", "drivers (page › Transactions)", "Every money movement for the driver: earnings, payouts, fees and adjustments.", BRIAN, [{ tab: /^Transactions/ }]),
+  st("a-driver-documents", "People & fleet", "Driver page · documents", "drivers (page › Documents)", "The four required documents with status, preview and review, plus upload on the driver's behalf.", BRIAN, [{ tab: /^Documents/ }]),
+  st("a-driver-support", "People & fleet", "Driver page · support", "drivers (page › Support)", "Support cases raised by this driver.", BRIAN, [{ tab: /^Support/ }]),
+  st("a-driver-notes", "People & fleet", "Driver page · notes", "drivers (page › Notes)", "Internal notes staff keep on the account.", BRIAN, [{ tab: /^Notes/ }]),
+  st("a-driver-activity", "People & fleet", "Driver page · activity", "drivers (page › Activity)", "Audit events about this account.", BRIAN, [{ tab: /^Activity/ }]),
+  st("a-person-edit", "People & fleet", "Edit account details", "drivers/customers (page › Edit details)", "Name, phone and email with a reason; duplicates are rejected.", BRIAN, [{ button: /Edit details/ }]),
+  st("a-person-message", "People & fleet", "Send a message", "drivers/customers (page › Message)", "The message appears in the person's Updates in the app.", BRIAN, [{ button: /^Message/ }]),
+  st("a-person-note", "People & fleet", "Add internal note", "drivers/customers (page › Notes › Add note)", "Staff-only note on the account.", BRIAN, [{ tab: /^Notes/ }, { button: /Add note/ }]),
+  st("a-driver-edit-vehicle", "People & fleet", "Edit vehicle", "drivers (page › More › Edit vehicle)", "Make, plate and truck category; blocked during a trip.", BRIAN, more(/Edit vehicle/)),
+  st("a-person-reset", "People & fleet", "Reset password · confirm", "drivers/customers (page › More › Reset password)", "Signs them out everywhere and sets a temporary password.", BRIAN, more(/Reset password/)),
+  st("a-driver-offline", "People & fleet", "Set driver offline · confirm", "drivers (page › More › Set offline)", "Withdraws any open request; accepted trips stay assigned.", BRIAN, more(/Set offline/), { setup: online }),
+  st("a-driver-revoke", "People & fleet", "Revoke verification · confirm", "drivers (page › More › Revoke verification)", "The driver goes offline until documents and vehicle are approved again.", BRIAN, more(/Revoke verification/)),
+  st("a-person-suspend", "People & fleet", "Suspend account · confirm", "drivers/customers (page › More › Suspend)", "Signs them out and blocks sign-in until reactivated; active trips continue.", BRIAN, more(/Suspend account/)),
+  st("a-person-deactivate", "People & fleet", "Deactivate account · confirm", "drivers/customers (page › More › Deactivate)", "Closes the account; records are kept and it can be reactivated.", BRIAN, more(/Deactivate account/)),
+  st("a-driver-suspended", "People & fleet", "Driver page · suspended", "drivers (page, suspended)", "A suspended driver: status badge and Reactivate in More.", "/drivers/driver-105"),
+  st("a-person-reactivate", "People & fleet", "Reactivate account · confirm", "drivers/customers (page › More › Reactivate)", "Lets a suspended or deactivated account sign in again.", "/drivers/driver-105", more(/Reactivate account/)),
+  st("a-driver-pending", "People & fleet", "Driver page · awaiting verification", "drivers (page, unverified)", "A registered driver whose vehicle and documents still need approval.", "/drivers/driver-104", [{ tab: /^Documents/ }]),
+  st("a-document-preview", "People & fleet", "Document preview", "drivers (page › Documents › Preview)", "The uploaded file as the driver sent it.", BRIAN, [{ tab: /^Documents/ }, { button: "Preview", wait: 1800 }]),
+  st("a-document-review", "People & fleet", "Review document", "drivers (page › Documents › Review)", "Approve or reject with a note; the driver sees the result.", BRIAN, [{ tab: /^Documents/ }, { button: "Review" }]),
+  st("a-document-remove", "People & fleet", "Remove document evidence · confirm", "drivers (page › Documents › Remove)", "Deletes an uploaded file (permission: Delete driver documents).", BRIAN, [{ tab: /^Documents/ }, { button: "Remove" }]),
+  st("a-customer-trips", "People & fleet", "Customer page · trips", "customers (page /customers/:id)", "All trips for one customer, filterable by status.", "/customers/customer-1"),
+  st("a-customer-support", "People & fleet", "Customer page · support", "customers (page › Support)", "Support cases the customer raised.", "/customers/customer-1", [{ tab: /^Support/ }]),
+  st("a-customer-notes", "People & fleet", "Customer page · notes", "customers (page › Notes)", "Internal notes on the customer.", "/customers/customer-1", [{ tab: /^Notes/ }]),
+  st("a-customer-activity", "People & fleet", "Customer page · activity", "customers (page › Activity)", "Audit events about the customer.", "/customers/customer-1", [{ tab: /^Activity/ }]),
+  st("a-customer-more", "People & fleet", "Customer page · More actions", "customers (page › More)", "Reset password, suspend or deactivate a customer.", "/customers/customer-1", [{ button: "More actions" }]),
+  // Money & control
+  st("a-payout-review", "Money & control", "Review payout request", "payouts (form dialog)", "Approve for finance payment, mark paid or reject, always with a reason.", "/payouts", [{ button: "Review request" }]),
+  st("a-transfer-new", "Money & control", "New transfer", "transfers (form dialog)", "Create a demo transfer between ledger accounts.", "/transfers", [{ button: /New transfer/ }]),
+  st("a-recon-import", "Money & control", "Import settlement report", "reconciliation (form dialog)", "Load a provider settlement report to compare with LoadMaster records.", "/reconciliation", [{ button: /Import report/ }]),
+  st("a-reward-new", "Money & control", "New reward", "rewards (form dialog)", "Create a referral or cashback reward for an account.", "/rewards", [{ button: /New reward/ }]),
+  st("a-reward-pay", "Money & control", "Pay reward · confirm", "rewards (form dialog)", "Pays a pending reward into the account's wallet.", "/rewards", [{ button: "Pay reward" }]),
+  // Management
+  st("a-support-reply", "Management", "Reply to a support case", "support (form dialog)", "Reply to the customer or driver and set the case status.", "/support", [{ button: "Reply / resolve" }]),
+  st("a-support-history", "Management", "Support case history", "support (row › history)", "The full conversation and status changes on one case.", "/support", [{ row: 0 }]),
+  st("a-staff-invite", "Management", "Invite staff", "staff (form dialog)", "Name, email, phone and role; a temporary password is issued.", "/staff", [{ button: /Invite staff/ }]),
+  st("a-staff-person", "Management", "Staff member", "staff (row › profile)", "A staff member's role, status and recent activity.", "/staff", [{ row: 1 }]),
+  st("a-staff-edit", "Management", "Update staff account", "staff (form dialog)", "Change role or status; the change applies on their next request.", "/staff", [{ button: "Edit account" }]),
+  st("a-staff-reset", "Management", "Reset staff credentials", "staff (form dialog)", "Issues a temporary password and signs them out.", "/staff", [{ button: "Reset" }]),
+  st("a-role-new", "Management", "New role", "staff (role dialog)", "Name, description and permissions for a new role.", "/staff", [{ button: /New role/ }]),
+  st("a-role-delete", "Management", "Delete role · confirm", "staff (role dialog)", "Refused while any staff member holds the role.", "/staff", [{ button: "Delete" }]),
+  st("a-audit-event", "Management", "Audit event", "audit (row › detail)", "One recorded action: who, when, target and the full detail.", "/audit", [{ row: 0 }]),
+  st("a-settings-pricing", "Management", "Edit pricing rules", "settings (form dialog)", "Platform fee, helper rate and driver response window for new trips.", "/settings", [{ button: "Edit pricing rules" }]),
+];
+
 export const SCREENS = [
   // Customer
   { id: "c-signin", app: C, signedOut: true },
@@ -88,7 +158,7 @@ export const SCREENS = [
   { id: "c-payment-methods", app: C, steps: [tab("Account"), go("Payment methods")] },
   { id: "c-saved-places", app: C, steps: [tab("Account"), go("Saved places")] },
   { id: "c-preferences", app: C, steps: [tab("Account"), go("More account options", 800), go("Settings & privacy")] },
-  { id: "c-notifications", app: C, steps: [async (p) => p.getByLabel(/notification/i).first().click()] },
+  { id: "c-notifications", app: C, steps: [async (p) => p.getByLabel(/notification|updates/i).first().click()] },
   // Driver
   { id: "d-signin", app: D, signedOut: true },
   { id: "d-register", app: D, signedOut: true, steps: [go("Create account")] },
@@ -117,6 +187,7 @@ export const SCREENS = [
   { id: "d-decline", app: D, steps: [banner, go("Decline request")] },
   { id: "d-done-accepted", app: D, steps: [banner, go("Accept this order", 900)], settle: 0 },
   { id: "a-trip-dispatch", app: A, ...tripPage("Driver requests") },
+  { id: "a-assign", app: A, steps: [...tripPage().steps, { button: "Manage assignment" }] },
   { id: "c-order-assigned", app: C, steps: openOrder("Orders") },
   { id: "d-order-pickup", app: D, setup: advance("to_pickup", "at_pickup"), steps: openOrder("Deliveries") },
   { id: "c-chat", app: C, steps: [...openOrder("Orders"), go("Messages & quick replies", 2000)] },
@@ -148,10 +219,12 @@ export const SCREENS = [
     ["a-reports", "/reports"],
     ["a-settings", "/settings"],
   ].map(([id, path]) => ({ id, app: A, path })),
+  ...ADMIN_STATES,
+  { id: "a-role-edit", app: A, path: "/staff", steps: [{ button: "Edit", nth: 0 }] },
   { id: "a-driver-detail", app: A, path: "/drivers/driver-1" },
   { id: "a-driver-profile", app: A, path: "/drivers/driver-1", steps: [{ click: "Profile", exact: true }] },
   { id: "a-driver-more", app: A, path: "/drivers/driver-1", steps: [{ click: "More", exact: true }] },
   { id: "a-driver-requests", app: A, path: "/drivers/driver-1", steps: [{ click: "Requests", exact: true }] },
-  { id: "a-customer-detail", app: A, path: "/customers/customer-1" },
+  { id: "a-customer-detail", app: A, path: "/customers/customer-1", steps: [{ tab: /^Transactions/ }] },
   { id: "a-customer-profile", app: A, path: "/customers/customer-1", steps: [{ click: "Profile", exact: true }] },
 ];

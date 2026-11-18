@@ -1,9 +1,6 @@
-import truckImage from "../assets/figma/order-small-truck-back-side1.png";
 import { typography, metrics } from "./mobileDesign";
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import {
-  Image,
-  Platform,
   Pressable,
   RefreshControl,
   ScrollView,
@@ -11,10 +8,7 @@ import {
   Text,
   View,
 } from "react-native";
-import {
-  SafeAreaView,
-  useSafeAreaInsets,
-} from "react-native-safe-area-context";
+import { SafeAreaView } from "react-native-safe-area-context";
 import { useNavigation } from "@react-navigation/native";
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import { LinearGradient } from "expo-linear-gradient";
@@ -31,11 +25,25 @@ import { PromoModal } from "./CargoUI";
 export function CustomerHome() {
   const { data, error, refresh, client } = useDemo();
   const privacy = useAction();
-  const insets = useSafeAreaInsets();
   const nav = useNavigation<NativeStackNavigationProp<RootStack>>();
   const [hidden, setHidden] = useState<boolean | null>(null);
   const [wallet, setWallet] = useState(false);
   const [promoOpen, setPromoOpen] = useState(false);
+  const [hour, setHour] = useState(() => new Date().getHours());
+  useEffect(() => {
+    const timer = setInterval(() => setHour(new Date().getHours()), 60_000);
+    return () => clearInterval(timer);
+  }, []);
+  const firstName = data?.profile.name.trim().split(/\s+/)[0] || "there";
+  let greeting = "Good morning";
+  let greetingEmoji = "🌅";
+  if (hour >= 18 || hour < 5) {
+    greeting = "Good evening";
+    greetingEmoji = "🌙";
+  } else if (hour >= 12) {
+    greeting = "Good afternoon";
+    greetingEmoji = "☀️";
+  }
   const balanceHidden = hidden ?? !!data?.profile.preferences?.hideAmounts;
   const togglePrivacy = () => {
     const next = !balanceHidden;
@@ -53,51 +61,40 @@ export function CustomerHome() {
   };
   const orders = data?.orders || [];
   const active = orders.find((o) => !terminal(o) && o.stage !== "scheduled");
+  const scheduled = orders
+    .filter((order) => order.stage === "scheduled" && order.scheduledAt)
+    .sort((a, b) => Date.parse(a.scheduledAt!) - Date.parse(b.scheduledAt!))[0];
+  const featured = active ?? scheduled;
   const due = orders.find(
     (o) => o.stage === "delivered" && o.payment.status !== "paid",
   );
-  const recent = [...orders]
-    .sort((a, b) => b.createdAt.localeCompare(a.createdAt))
-    .slice(0, 2);
-  const shortcuts: { label: string; icon: FigmaIconName; press: () => void }[] =
-    [
-      {
-        label: "Schedule\npickup",
-        icon: "home-lucide-icons-calendar-clock",
-        press: () => nav.navigate("Locations", { scheduled: true }),
-      },
-      {
-        label: "Order again",
-        icon: "home-lucide-icons-history",
-        press: () => nav.navigate("OrderStart", { mode: "repeat" }),
-      },
-      {
-        label: "Choose\na truck",
-        icon: "home-lucide-icons-truck",
-        press: () => nav.navigate("OrderStart", { mode: "truck" }),
-      },
-      {
-        label: "Match a\ndriver",
-        icon: "home-lucide-icons-map-pin",
-        press: () => nav.navigate("OrderStart", { mode: "driver" }),
-      },
-    ];
+  const shortcuts: {
+    label: string;
+    icon: FigmaIconName | "driver";
+    press: () => void;
+  }[] = [
+    {
+      label: "Schedule pickup",
+      icon: "home-lucide-icons-calendar-clock",
+      press: () => nav.navigate("Locations", { scheduled: true }),
+    },
+    {
+      label: "Order again",
+      icon: "home-lucide-icons-history",
+      press: () => nav.navigate("OrderStart", { mode: "repeat" }),
+    },
+    {
+      label: "Use a driver ID",
+      icon: "driver",
+      press: () => nav.navigate("OrderStart", { mode: "driver" }),
+    },
+  ];
   return (
     <SafeAreaView edges={["left", "right"]} style={styles.page}>
       <View style={styles.header}>
         <View style={{ flex: 1, gap: 2 }}>
-          <Text
-            style={{
-              ...typography.label,
-              fontWeight: "700",
-              letterSpacing: -0.5,
-              color: T.brandGreen,
-            }}
-          >
-            LoadMaster
-          </Text>
           <Text style={styles.greeting}>
-            Hello, {data?.profile.name.split(" ")[0] || "there"} 👋
+            {greeting}, {firstName} {greetingEmoji}
           </Text>
           <Text accessibilityRole="header" style={styles.heading}>
             What are we moving today?
@@ -114,10 +111,7 @@ export function CustomerHome() {
       </View>
       <ScrollView
         contentInsetAdjustmentBehavior="never"
-        contentContainerStyle={[
-          styles.content,
-          { paddingBottom: Platform.OS === "ios" ? insets.bottom + 80 : 24 },
-        ]}
+        contentContainerStyle={styles.content}
         refreshControl={
           <RefreshControl
             refreshing={false}
@@ -130,73 +124,78 @@ export function CustomerHome() {
           message={error || privacy.error}
           onRetry={() => void refresh()}
         />
-        {active ? (
+        {due && (
+          <Pressable
+            accessibilityRole="button"
+            onPress={() => nav.navigate("Payment", { id: due.id })}
+            style={styles.paymentNotice}
+          >
+            <Text
+              style={{
+                color: "#805015",
+                fontWeight: "600",
+                ...typography.subhead,
+              }}
+            >
+              Payment needs your attention · {money(due.quote.total)} →
+            </Text>
+          </Pressable>
+        )}
+        {featured && (
           <LinearGradient
             colors={["#F0FAF4", "#DCF5E7"]}
             start={{ x: 0, y: 0 }}
             end={{ x: 1, y: 1 }}
             style={styles.hero}
           >
-            <View style={styles.heroMain}>
-              <View style={{ flex: 1, gap: 8 }}>
-                <View style={styles.pill}>
-                  <View style={styles.liveDot} />
-                  <Text style={styles.pillText}>Delivery in progress</Text>
-                </View>
-                <Text style={styles.heroTitle}>
-                  {stageLabels[active.stage]}
-                  {active.stage === "searching" ? "…" : ""}
-                </Text>
-                <View style={styles.locationRow}>
-                  <Icon name="ellipse-outline" size={13} color={T.green} />
-                  <Text style={styles.locationName}>
-                    {active.quote.pickup.name}
-                  </Text>
-                </View>
-                <View style={styles.locationRow}>
-                  <Icon name="location" size={14} color={T.danger} />
-                  <Text style={styles.locationName}>
-                    {active.quote.destination.name}
-                  </Text>
-                </View>
-              </View>
-              <Image
-                source={truckImage}
-                resizeMode="contain"
-                style={styles.truckImage}
-              />
+            <Text style={styles.pill}>
+              {active ? "Delivery in progress" : "Upcoming pickup"}
+            </Text>
+            <Text accessibilityRole="header" style={styles.heroTitle}>
+              {active
+                ? stageLabels[active.stage]
+                : new Date(featured.scheduledAt!).toLocaleString(undefined, {
+                    weekday: "short",
+                    month: "short",
+                    day: "numeric",
+                    hour: "numeric",
+                    minute: "2-digit",
+                  })}
+            </Text>
+            <View style={styles.locationRow}>
+              <Icon name="ellipse-outline" size={14} color={T.green} />
+              <Text style={styles.detailValue}>
+                Pickup: {featured.quote.pickup.name}
+              </Text>
             </View>
-            <View style={styles.tripFooter}>
-              <Icon name="time-outline" size={18} color={T.green} />
-              <View style={{ flex: 1 }}>
-                <Text style={styles.detailCaption}>Pickup</Text>
-                <Text style={styles.detailValue}>
-                  {active.stage === "searching"
-                    ? "Awaiting driver"
-                    : stageLabels[active.stage]}
-                </Text>
-              </View>
-              <Icon name="cube-outline" size={18} color={T.green} />
-              <View style={{ flex: 1 }}>
-                <Text style={styles.detailCaption}>Cargo</Text>
-                <Text numberOfLines={1} style={styles.detailValue}>
-                  {active.cargo ||
-                    active.cargoPlan?.items[0]?.description ||
-                    "General goods"}
-                </Text>
-              </View>
-              <Pressable
-                accessibilityRole="button"
-                accessibilityLabel="Track active delivery"
-                onPress={() => nav.navigate("Order", { id: active.id })}
-                style={styles.trackButton}
-              >
-                <Text style={styles.trackText}>Track delivery →</Text>
-              </Pressable>
+            <View style={styles.locationRow}>
+              <Icon name="location" size={14} color={T.danger} />
+              <Text style={styles.detailValue}>
+                Destination: {featured.quote.destination.name}
+              </Text>
             </View>
+            <View style={styles.locationRow}>
+              <Icon name="cube-outline" size={14} color={T.green} />
+              <Text style={styles.detailValue}>
+                Cargo:{" "}
+                {featured.cargo ||
+                  featured.cargoPlan?.items[0]?.description ||
+                  "General goods"}
+              </Text>
+            </View>
+            <Pressable
+              accessibilityRole="button"
+              onPress={() => nav.navigate("Order", { id: featured.id })}
+              style={({ pressed }) => [
+                styles.trackButton,
+                pressed && { opacity: 0.85 },
+              ]}
+            >
+              <Text style={styles.trackText}>
+                {active ? "Track delivery" : "View scheduled order"}
+              </Text>
+            </Pressable>
           </LinearGradient>
-        ) : (
-          <HomeArtworkSlider />
         )}
         <Pressable
           accessibilityRole="button"
@@ -218,14 +217,14 @@ export function CustomerHome() {
             <Pressable
               key={item.label}
               accessibilityRole="button"
-              accessibilityLabel={item.label.replace("\n", " ")}
+              accessibilityLabel={item.label}
               onPress={item.press}
               style={({ pressed }) => [
                 styles.shortcut,
                 pressed && { backgroundColor: T.pale },
               ]}
             >
-              {item.label.replace("\n", " ") === "Match a driver" ? (
+              {item.icon === "driver" ? (
                 <Icon name="person-add-outline" size={23} color={T.green} />
               ) : (
                 <FigmaIcon name={item.icon} />
@@ -235,120 +234,45 @@ export function CustomerHome() {
           ))}
         </View>
         <View style={styles.wallet}>
-          <View style={styles.walletLabel}>
-            <FigmaIcon name="home-lucide-icons-wallet" />
-            <Text style={styles.walletCaption}>Wallet balance</Text>
-            <Pressable
-              accessibilityRole="button"
-              accessibilityLabel={
-                balanceHidden ? "Show wallet balance" : "Hide wallet balance"
-              }
-              accessibilityState={{ selected: balanceHidden }}
-              onPress={togglePrivacy}
-              disabled={privacy.busy}
-              hitSlop={6}
-              style={styles.eye}
-            >
-              {balanceHidden ? (
-                <Icon name="eye-off-outline" size={20} color={T.muted} />
-              ) : (
-                <FigmaIcon name="home-frame" />
-              )}
-            </Pressable>
-          </View>
-          <View style={styles.balanceRow}>
-            <Text style={styles.balance}>
-              {balanceHidden
-                ? "UGX ••••••"
-                : money(data?.adjustmentBalance || 0)}
-            </Text>
-            <Pressable
-              accessibilityRole="button"
-              onPress={() => setWallet(true)}
-              hitSlop={4}
-              style={styles.addFunds}
-            >
-              <Text style={styles.link}>Add funds</Text>
-            </Pressable>
-          </View>
-        </View>
-        {due && (
-          <Pressable
-            accessibilityRole="button"
-            onPress={() => nav.navigate("Payment", { id: due.id })}
-            style={styles.paymentNotice}
-          >
-            <Text
-              style={{
-                color: "#805015",
-                fontWeight: "600",
-                ...typography.subhead,
-              }}
-            >
-              Payment needs your attention · {money(due.quote.total)} →
-            </Text>
-          </Pressable>
-        )}
-        <View style={styles.activityHeader}>
-          <Text style={styles.activityTitle}>Recent activity</Text>
-          <Pressable
-            accessibilityRole="button"
-            accessibilityLabel="View all orders"
-            onPress={() => nav.navigate("Main", { screen: "Orders" })}
-            hitSlop={6}
-            style={styles.viewAll}
-          >
-            <Text style={styles.link}>View all</Text>
-            <FigmaIcon name="home-lucide-icons-arrow-right1" />
-          </Pressable>
-        </View>
-        <View style={{ gap: 8 }}>
-          {recent.length ? (
-            recent.map((o) => (
+          <View style={{ flex: 1, gap: 2 }}>
+            <View style={styles.walletLabel}>
+              <FigmaIcon name="home-lucide-icons-wallet" />
+              <Text style={styles.walletCaption}>Wallet balance</Text>
+            </View>
+            <View style={styles.balanceRow}>
+              <Text style={styles.balance}>
+                {balanceHidden
+                  ? "UGX ••••••"
+                  : money(data?.adjustmentBalance || 0)}
+              </Text>
               <Pressable
                 accessibilityRole="button"
-                accessibilityLabel={`View order ${o.id}`}
-                key={o.id}
-                style={styles.activity}
-                onPress={() => nav.navigate("Order", { id: o.id })}
+                accessibilityLabel={
+                  balanceHidden ? "Show wallet balance" : "Hide wallet balance"
+                }
+                accessibilityState={{ selected: balanceHidden }}
+                onPress={togglePrivacy}
+                disabled={privacy.busy}
+                hitSlop={14}
               >
-                <View style={styles.activityIcon}>
-                  <FigmaIcon name="home-lucide-icons-truck1" />
-                </View>
-                <View style={{ flex: 1, gap: 3 }}>
-                  <Text numberOfLines={1} style={styles.route}>
-                    {o.quote.pickup.name} → {o.quote.destination.name}
-                  </Text>
-                  <Text style={styles.date}>
-                    {new Date(o.createdAt).toLocaleDateString(undefined, {
-                      month: "short",
-                      day: "numeric",
-                    })}
-                  </Text>
-                </View>
-                <View
-                  style={[
-                    styles.status,
-                    o.stage !== "delivered" && { backgroundColor: "#F1F5F9" },
-                  ]}
-                >
-                  <Text style={styles.statusText}>
-                    {o.stage === "delivered"
-                      ? "Completed"
-                      : stageLabels[o.stage]}
-                  </Text>
-                </View>
+                <Icon
+                  name={balanceHidden ? "eye-off-outline" : "eye-outline"}
+                  size={16}
+                  color="#475569"
+                />
               </Pressable>
-            ))
-          ) : (
-            <View style={styles.empty}>
-              <Text style={styles.route}>Your first move starts here</Text>
-              <Text style={styles.date}>
-                Your orders and delivery updates will appear here.
-              </Text>
             </View>
-          )}
+          </View>
+          <Pressable
+            accessibilityRole="button"
+            onPress={() => setWallet(true)}
+            hitSlop={12}
+            style={styles.addFunds}
+          >
+            <Text style={styles.addFundsText}>Add funds</Text>
+          </Pressable>
         </View>
+        {!featured && <HomeArtworkSlider />}
         <Pressable
           accessibilityRole="button"
           accessibilityLabel="View loyalty rewards offer"
@@ -363,7 +287,7 @@ export function CustomerHome() {
               Loyalty & referral rewards
             </Text>
             <Text style={styles.promoBannerSub}>
-              Tap to view how rewards apply to your next moves
+              See how to earn and use rewards.
             </Text>
           </View>
           <Icon name="chevron-forward" size={18} color={T.green} />
@@ -375,29 +299,23 @@ export function CustomerHome() {
   );
 }
 const styles = StyleSheet.create({
-  heroMain: { flexDirection: "row", alignItems: "center", gap: 8 },
-  liveDot: { width: 6, height: 6, borderRadius: 3, backgroundColor: T.green },
-  truckImage: { width: 112, height: 100 },
-  locationRow: { flexDirection: "row", alignItems: "center", gap: 7 },
-  locationName: { ...typography.caption, color: T.ink, flex: 1 },
-  tripFooter: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 6,
-    borderTopWidth: StyleSheet.hairlineWidth,
-    borderTopColor: "#DCECE1",
-    paddingTop: 10,
-  },
-  detailCaption: { fontSize: 10, lineHeight: 14, color: T.muted },
-  detailValue: { ...typography.caption, fontWeight: "600", color: T.ink },
+  locationRow: { flexDirection: "row", alignItems: "center", gap: 8 },
+  detailValue: { ...typography.subhead, color: T.ink, flex: 1 },
   trackButton: {
-    minHeight: 44,
-    paddingHorizontal: 10,
+    minHeight: metrics.touch,
+    paddingHorizontal: 14,
+    paddingVertical: 8,
     justifyContent: "center",
-    borderRadius: 24,
-    backgroundColor: "#D9F2DF",
+    alignItems: "center",
+    borderRadius: 12,
+    backgroundColor: T.green,
   },
-  trackText: { ...typography.caption, fontWeight: "600", color: T.green },
+  trackText: {
+    ...typography.subhead,
+    fontWeight: "700",
+    color: "white",
+    textAlign: "center",
+  },
   page: { flex: 1, backgroundColor: "white" },
   header: {
     paddingHorizontal: 16,
@@ -438,41 +356,21 @@ const styles = StyleSheet.create({
     gap: 10,
   },
   pill: {
+    ...typography.caption,
     alignSelf: "flex-start",
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 6,
     paddingHorizontal: 10,
     paddingVertical: 4,
     borderRadius: 30,
     backgroundColor: "#DCFCE7",
+    fontWeight: "600",
+    color: T.green,
   },
-  pillText: { ...typography.caption, fontWeight: "600", color: T.green },
   heroTitle: { ...typography.section, fontWeight: "700", color: T.ink },
-  heroBottom: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "flex-start",
-  },
-  heroDescription: {
-    ...typography.subhead,
-
-    color: "#1A5837",
-    flex: 1,
-  },
-  heroTruck: {
-    width: 60,
-    height: 60,
-    borderRadius: 16,
-    backgroundColor: "#FFFFFF99",
-    alignItems: "center",
-    justifyContent: "center",
-  },
   order: {
     backgroundColor: T.green,
-    paddingHorizontal: 16,
-    paddingVertical: 14,
-    borderRadius: 18,
+    paddingHorizontal: 14,
+    paddingVertical: 18,
+    borderRadius: 16,
     flexDirection: "row",
     alignItems: "center",
     gap: 12,
@@ -485,18 +383,23 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
   },
-  orderTitle: { ...typography.label, fontWeight: "600", color: "white" },
+  orderTitle: {
+    fontSize: 14,
+    lineHeight: 24,
+    fontWeight: "600",
+    color: "white",
+  },
   orderSubtitle: { ...typography.caption, color: "#D0EFDF" },
-  shortcuts: { flexDirection: "row", gap: 8, alignItems: "stretch" },
+  shortcuts: { flexDirection: "row", gap: 12, alignItems: "stretch" },
   shortcut: {
     flex: 1,
-    minHeight: 78,
-    borderWidth: StyleSheet.hairlineWidth,
+    minHeight: 60,
+    borderWidth: 0.5,
     borderColor: T.border,
-    borderRadius: 16,
+    borderRadius: 12,
     paddingHorizontal: 4,
-    paddingVertical: 10,
-    gap: 6,
+    paddingVertical: 16,
+    gap: 4,
     alignItems: "center",
     justifyContent: "center",
     backgroundColor: "white",
@@ -509,80 +412,31 @@ const styles = StyleSheet.create({
     flexShrink: 1,
   },
   wallet: {
-    padding: 14,
-    gap: 2,
-    borderWidth: StyleSheet.hairlineWidth,
+    paddingHorizontal: 14,
+    paddingVertical: 16,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    borderWidth: 0.5,
     borderColor: T.border,
-    borderRadius: 18,
+    borderRadius: 12,
     backgroundColor: "#FAFDFB",
   },
   walletLabel: { flexDirection: "row", alignItems: "center", gap: 8 },
-  walletCaption: { ...typography.caption, color: T.muted, flex: 1 },
-  eye: {
-    width: metrics.touch,
-    height: metrics.touch,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  balanceRow: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-    gap: 8,
-  },
-  balance: { ...typography.headline, fontWeight: "700", color: T.ink },
+  walletCaption: { ...typography.caption, color: T.muted },
+  balanceRow: { flexDirection: "row", alignItems: "center", gap: 12 },
+  balance: { fontSize: 12, lineHeight: 30, fontWeight: "700", color: T.ink },
   addFunds: {
-    borderRadius: 30,
+    borderRadius: 8,
     backgroundColor: T.pale,
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    minHeight: metrics.touch,
+    padding: 4,
     justifyContent: "center",
   },
-  link: { ...typography.caption, fontWeight: "600", color: "#077537" },
-  activityHeader: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    marginBottom: -8,
-  },
-  activityTitle: { ...typography.body, fontWeight: "600", color: T.ink },
-  viewAll: {
-    flexDirection: "row",
-    gap: 2,
-    alignItems: "center",
-    minHeight: metrics.touch,
-  },
-  activity: {
-    padding: 12,
-    borderWidth: StyleSheet.hairlineWidth,
-    borderColor: T.border,
-    borderRadius: 14,
-    flexDirection: "row",
-    gap: 12,
-    alignItems: "center",
-  },
-  activityIcon: {
-    width: metrics.touch,
-    height: 36,
-    backgroundColor: T.pale,
-    borderRadius: 10,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  route: { ...typography.subhead, fontWeight: "600", color: T.ink },
-  date: { ...typography.caption, color: T.muted },
-  status: {
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 30,
-    backgroundColor: "#DCFCE7",
-    maxWidth: 100,
-  },
-  statusText: { ...typography.caption, fontWeight: "600", color: "#077537" },
-  empty: {
-    paddingVertical: 12,
-    gap: 6,
+  addFundsText: {
+    fontSize: 12,
+    lineHeight: 18,
+    fontWeight: "600",
+    color: "#077537",
   },
   paymentNotice: {
     padding: 12,

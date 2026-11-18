@@ -4,7 +4,7 @@ final class SmokeTests: XCTestCase {
   func testCustomerAndDriverNativeHomes() throws {
     continueAfterFailure = false
     let springboard = XCUIApplication(bundleIdentifier: "com.apple.springboard")
-    for (role, email, greeting, port) in [("customer", "alex@example.test", "Hello, Alex", 8081), ("driver", "brian@example.test", "Hello, Brian", 8082)] {
+    for (role, email, greeting, port) in [("customer", "alex@example.test", ", Alex", 8081), ("driver", "brian@example.test", "Hello, Brian", 8082)] {
       let app = XCUIApplication(bundleIdentifier: "ug.co.loadmaster.v2.\(role)")
       app.terminate()
       app.launch()
@@ -81,7 +81,7 @@ final class SmokeTests: XCTestCase {
           app.tabBars.buttons["Home"].tap()
           XCTAssertTrue(app.staticTexts.containing(NSPredicate(format: "label CONTAINS %@", greeting)).firstMatch.waitForExistence(timeout: 15))
         }
-        switchCustomer("Sarah Nakato", greeting: "Hello, Sarah")
+        switchCustomer("Sarah Nakato", greeting: ", Sarah")
         XCTAssertTrue(app.buttons["Next artwork"].waitForExistence(timeout: 10))
         app.buttons["Next artwork"].tap()
         XCTAssertTrue(app.staticTexts["Household moves"].waitForExistence(timeout: 5))
@@ -89,7 +89,7 @@ final class SmokeTests: XCTestCase {
         let carousel = XCTAttachment(screenshot: app.screenshot()); carousel.name="backup-household-carousel-ios"; carousel.lifetime = .keepAlways; add(carousel)
         app.buttons["Show artwork 3: Business deliveries"].tap()
         XCTAssertTrue(app.staticTexts["Business deliveries"].waitForExistence(timeout: 5))
-        switchCustomer("Alex Mukasa", greeting: "Hello, Alex")
+        switchCustomer("Alex Mukasa", greeting: ", Alex")
       }
       XCTAssertTrue(app.tabBars.firstMatch.exists, "Native tab bar is present")
       let tab = app.tabBars.buttons[role == "customer" ? "Orders" : "Deliveries"]

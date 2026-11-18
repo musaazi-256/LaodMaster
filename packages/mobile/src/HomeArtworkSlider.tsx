@@ -1,4 +1,3 @@
-import { typography } from "./mobileDesign";
 import React, { useEffect, useRef, useState } from "react";
 import {
   AccessibilityInfo,
@@ -135,14 +134,13 @@ export function HomeArtworkSlider() {
               style={StyleSheet.absoluteFill}
             />
             <View style={s.copy}>
-              <View style={s.tag}>
-                <View style={s.dot} />
-                <Text style={s.tagText}>{slide.label}</Text>
-              </View>
-              <Text accessibilityRole="header" style={s.title}>
+              <Text
+                accessibilityRole="header"
+                accessibilityHint={slide.description.replace("\n", " ")}
+                style={s.title}
+              >
                 {slide.title}
               </Text>
-              <Text style={s.description}>{slide.description}</Text>
             </View>
           </View>
         ))}
@@ -154,9 +152,11 @@ export function HomeArtworkSlider() {
           accessibilityState={{ disabled: current === 0 }}
           disabled={current === 0}
           onPress={() => show(current - 1)}
-          style={[s.arrow, current === 0 && { opacity: 0.35 }]}
+          style={s.arrowHit}
         >
-          <Icon name="chevron-back" size={19} color={T.green} />
+          <View style={[s.arrow, current === 0 && { opacity: 0.35 }]}>
+            <Icon name="chevron-back" size={12} color={T.green} />
+          </View>
         </Pressable>
         <View style={s.dots}>
           {slides.map((slide, i) => (
@@ -167,6 +167,7 @@ export function HomeArtworkSlider() {
               accessibilityState={{ selected: current === i }}
               aria-pressed={current === i}
               onPress={() => show(i)}
+              hitSlop={{ top: 7, bottom: 7 }}
               style={s.dotButton}
             >
               <View style={[s.indicator, current === i && s.selected]} />
@@ -179,9 +180,16 @@ export function HomeArtworkSlider() {
           accessibilityState={{ disabled: current === slides.length - 1 }}
           disabled={current === slides.length - 1}
           onPress={() => show(current + 1)}
-          style={[s.arrow, current === slides.length - 1 && { opacity: 0.35 }]}
+          style={s.arrowHit}
         >
-          <Icon name="chevron-forward" size={19} color={T.green} />
+          <View
+            style={[
+              s.arrow,
+              current === slides.length - 1 && { opacity: 0.35 },
+            ]}
+          >
+            <Icon name="chevron-forward" size={12} color={T.green} />
+          </View>
         </Pressable>
       </View>
     </View>
@@ -189,65 +197,65 @@ export function HomeArtworkSlider() {
 }
 const s = StyleSheet.create({
   frame: {
-    borderRadius: 24,
+    borderRadius: 16,
     overflow: "hidden",
     backgroundColor: T.pale,
     borderWidth: 1,
     borderColor: "#DCF5E7",
   },
-  copy: { padding: 18, paddingBottom: 54, gap: 11, maxWidth: "64%" },
-  tag: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 5,
-    alignSelf: "flex-start",
-    backgroundColor: "#DCF5E7",
-    paddingVertical: 5,
-    paddingHorizontal: 7,
-    borderRadius: 20,
+  copy: {
+    flex: 1,
+    justifyContent: "center",
+    paddingHorizontal: 18,
+    paddingBottom: 18,
+    maxWidth: "64%",
   },
-  dot: { width: 5, height: 5, borderRadius: 3, backgroundColor: T.green },
-  tagText: { ...typography.caption, fontWeight: "600", color: T.green },
   title: {
-    ...typography.title,
-
+    fontSize: 24,
+    lineHeight: 28,
     fontWeight: "700",
-    letterSpacing: -0.7,
     color: "#123D30",
   },
-  description: { ...typography.caption, color: "#355A44" },
   controls: {
     position: "absolute",
-    left: 8,
-    right: 8,
-    bottom: 5,
+    left: 9,
+    right: 9,
+    bottom: 3,
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
   },
-  arrow: {
+  arrowHit: {
     width: 44,
     height: 44,
-    borderRadius: 22,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  arrow: {
+    width: 22,
+    height: 22,
+    borderRadius: 11,
     backgroundColor: "#FFFFFFDE",
     alignItems: "center",
     justifyContent: "center",
   },
   dots: {
     flexDirection: "row",
+    alignItems: "center",
+    paddingHorizontal: 4,
     backgroundColor: "#F5FCF6E6",
-    borderRadius: 24,
+    borderRadius: 22,
   },
   dotButton: {
-    width: 44,
-    height: 44,
+    width: 41,
+    height: 30,
     alignItems: "center",
     justifyContent: "center",
   },
   indicator: {
     width: 6,
     height: 6,
-    borderRadius: 4,
+    borderRadius: 3,
     backgroundColor: "#819B8B",
   },
   selected: { width: 19, backgroundColor: T.green },

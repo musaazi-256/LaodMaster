@@ -29,11 +29,19 @@ import asset27 from "../assets/figma/home-lucide-icons-house.svg";
 import asset28 from "../assets/figma/home-lucide-icons-truck2.svg";
 import asset29 from "../assets/figma/home-lucide-icons-receipt.svg";
 import asset30 from "../assets/figma/home-lucide-icons-user.svg";
+import mapBack from "../assets/figma/order-map-back.svg";
+import mapCurrentLocation from "../assets/figma/order-map-current-location.svg";
 import React from "react";
 import { View } from "react-native";
 import { Asset } from "expo-asset";
 import { SvgUri } from "react-native-svg";
 export const figmaAssets = {
+  "order-map-back": { source: mapBack, width: 9.33333, height: 9.33333 },
+  "order-map-current-location": {
+    source: mapCurrentLocation,
+    width: 12.25,
+    height: 12.25,
+  },
   "order-ios-signal": {
     source: asset0,
     width: 20,

@@ -1,7 +1,7 @@
 // Captures the running apps screen by screen for the Figma handoff plugin.
 //   node scripts/capture/run.mjs [screen-id,...]
 // Needs the demo service (:4000), customer web (:8091), driver web (:8092) and
-// admin (:5173) running. Writes design/handoff/captures/<id>.json, then
+// admin (:4000/operations) running. Writes design/handoff/captures/<id>.json, then
 // `npm run handoff` bundles them into loadmaster-handoff-captured.json.
 import { chromium } from "playwright";
 import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
@@ -48,6 +48,12 @@ const steps = async (page, list) => {
     else if (s.click) await page.getByText(s.click, { exact: s.exact ?? false }).first().click();
     else if (s.goto) await page.goto(s.goto);
     else if (s.fill) await page.getByPlaceholder(s.fill).first().fill(s.value);
+    else if (s.button) await page.getByRole("button", { name: s.button, exact: typeof s.button === "string" }).nth(s.nth ?? 0).click();
+    else if (s.tab) await page.getByRole("tab", { name: s.tab }).first().click();
+    else if (s.menu) await page.getByRole("menuitem", { name: s.menu }).first().click();
+    else if (s.label) await page.getByLabel(s.label, { exact: true }).first().click();
+    else if (s.row !== undefined) await page.locator("tbody tr").nth(s.row).click();
+    else if (s.type) await page.locator("textarea:visible, input:visible").nth(s.nth ?? 0).fill(s.type);
     if (s.wait !== 0) await page.waitForTimeout(s.wait ?? 900);
   }
 };
@@ -73,9 +79,20 @@ for (const sc of SCREENS) {
     await page.waitForTimeout(sc.app.kind === "admin" ? 2500 : 3000);
     await steps(page, sc.steps);
     await page.waitForTimeout(sc.settle ?? 700);
-    const v = VIEW[sc.app.kind];
+    const v = { ...VIEW[sc.app.kind] };
+    // Admin pages are captured at their full length (up to 4000 px); dialogs and
+    // menus stay at the window size they open in.
+    const overlay = await page.evaluate(() => Boolean(document.querySelector("[role=dialog],[role=alertdialog],[role=menu],[role=listbox]")));
+    if (sc.app.kind === "admin" && !overlay) {
+      v.height = Math.min(4000, Math.max(v.height, await page.evaluate(() => document.scrollingElement.scrollHeight)));
+      if (v.height > VIEW.admin.height) {
+        await page.setViewportSize(v);
+        await page.waitForTimeout(800);
+      }
+    }
     const tree = await page.evaluate(`(${extract})(${JSON.stringify(v)})`);
     if (process.env.CAPTURE_SHOTS) await page.screenshot({ path: process.env.CAPTURE_SHOTS + "/" + sc.id + ".png" });
+    if (v.height !== VIEW[sc.app.kind].height) await page.setViewportSize(VIEW[sc.app.kind]);
     iconsToSvg(tree);
     writeFileSync(out + sc.id + ".json", JSON.stringify({ id: sc.id, app: sc.app.key, ...tree }));
     if (sc.teardown) await sc.teardown(api);
