@@ -479,7 +479,7 @@
   "steps": [
    {
     "lane": "admin",
-    "label": "Trips: find LM-35416699 (assigned to Brian).",
+    "label": "Trips: find LM-8895AB7C (assigned to Brian).",
     "screen": "j-trip-reassign-01",
     "col": 0
    },
