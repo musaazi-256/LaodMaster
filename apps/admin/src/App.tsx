@@ -1,3 +1,5 @@
+import staffAuthLogo from "./assets/staff-auth-logo.svg";
+import staffAuthError from "./assets/staff-auth-error.svg";
 import {
   lazy,
   Suspense,
@@ -581,7 +583,10 @@ export default function App() {
                       <TripsPage />
                     ) : (page === "drivers" || page === "customers") &&
                       detail ? (
-                      <PersonPage id={decodeURIComponent(detail)} />
+                      <PersonPage
+                        key={detail}
+                        id={decodeURIComponent(detail)}
+                      />
                     ) : page === "drivers" || page === "customers" ? (
                       <PeoplePage
                         kind={page === "drivers" ? "driver" : "customer"}
@@ -644,38 +649,39 @@ function Login({ onLogin }: { onLogin: (s: string) => void }) {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   return (
-    <div className="login-screen">
-      <div className="login-art">
-        <div className="brand">
-          <div className="brand-mark">
-            <ArrowUpRight />
-          </div>
+    <main className="staff-auth">
+      <header className="staff-auth-header">
+        <div className="staff-auth-brand">
+          <span>
+            <img src={staffAuthLogo} alt="" />
+          </span>
           LoadMaster
         </div>
         <div>
-          <h1>Operations portal</h1>
+          <p className="staff-auth-portal">Operations portal</p>
           <p>
             Trips, drivers, customers and payments for LoadMaster cargo
             delivery.
           </p>
         </div>
-        <p className="demo-label">Demo environment · no real money</p>
-      </div>
-      <div className="login-form">
-        <h1>
-          {challenge
-            ? "Verify your identity"
-            : recover
-              ? "Let’s get you back in."
-              : "Sign in"}
-        </h1>
-        <p className="muted">
-          {challenge
-            ? "Use the displayed demo code. No SMS or email is sent."
-            : recover
-              ? "Enter your email or phone to preview password recovery."
-              : "Sign in with your individual staff account."}
-        </p>
+      </header>
+      <section className="staff-auth-card" aria-labelledby="staff-auth-title">
+        <div className="staff-auth-heading">
+          <h1 id="staff-auth-title">
+            {challenge
+              ? "Verify your identity"
+              : recover
+                ? "Let’s get you back in."
+                : "Sign in"}
+          </h1>
+          <p>
+            {challenge
+              ? "Use the displayed demo code. No SMS or email is sent."
+              : recover
+                ? "Enter your email or phone to preview password recovery."
+                : "Sign in with your individual staff account."}
+          </p>
+        </div>
         <form
           onSubmit={async (e) => {
             e.preventDefault();
@@ -704,85 +710,95 @@ function Login({ onLogin }: { onLogin: (s: string) => void }) {
             }
           }}
         >
-          <div className="form-fields">
-            {!challenge && (
-              <div className="field">
-                <Label htmlFor="login-id">Email or phone</Label>
+          {!challenge && (
+            <div className="staff-auth-field">
+              <Label htmlFor="login-id">Email or phone</Label>
+              <Input
+                id="login-id"
+                aria-invalid={!!error}
+                aria-describedby={error ? "staff-auth-error" : undefined}
+                autoComplete="username"
+                value={identifier}
+                onChange={(e) => setIdentifier(e.target.value)}
+                required
+              />
+            </div>
+          )}
+          {challenge && (
+            <>
+              <div className="staff-auth-code">
+                <span>Demo code:</span> <strong>{challenge.demoCode}</strong>
+              </div>
+              <div className="staff-auth-field">
+                <Label htmlFor="login-code">Verification code</Label>
                 <Input
-                  id="login-id"
-                  autoComplete="username"
-                  value={identifier}
-                  onChange={(e) => setIdentifier(e.target.value)}
+                  id="login-code"
+                  aria-invalid={!!error}
+                  aria-describedby={error ? "staff-auth-error" : undefined}
+                  value={code}
+                  onChange={(e) => setCode(e.target.value)}
+                  inputMode="numeric"
+                  autoComplete="one-time-code"
                   required
                 />
               </div>
-            )}
-            {challenge && (
-              <>
-                <div className="notice">
-                  Demo code: <strong>{challenge.demoCode}</strong>
-                </div>
-                <div className="field">
-                  <Label htmlFor="login-code">Verification code</Label>
-                  <Input
-                    id="login-code"
-                    value={code}
-                    onChange={(e) => setCode(e.target.value)}
-                    inputMode="numeric"
-                    autoComplete="one-time-code"
-                    required
-                  />
-                </div>
-              </>
-            )}
-            {(!recover || challenge) && (
-              <div className="field">
-                <Label htmlFor="login-password">
-                  {challenge ? "New password" : "Password"}
-                </Label>
-                <Input
-                  id="login-password"
-                  type="password"
-                  autoComplete={challenge ? "new-password" : "current-password"}
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  minLength={8}
-                  required
-                />
-              </div>
-            )}
-          </div>
-          <ErrorNotice error={error} />
-          <Button className="full-button" disabled={busy}>
+            </>
+          )}
+          {(!recover || challenge) && (
+            <div className="staff-auth-field">
+              <Label htmlFor="login-password">
+                {challenge ? "New password" : "Password"}
+              </Label>
+              <Input
+                id="login-password"
+                aria-invalid={!!error}
+                aria-describedby={error ? "staff-auth-error" : undefined}
+                type="password"
+                autoComplete={challenge ? "new-password" : "current-password"}
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                minLength={8}
+                required
+              />
+            </div>
+          )}
+          {error && (
+            <div
+              className="staff-auth-error"
+              role="alert"
+              id="staff-auth-error"
+            >
+              <img src={staffAuthError} alt="" />
+              {error}
+            </div>
+          )}
+          <Button type="submit" className="staff-auth-submit" disabled={busy}>
             {busy && <LoaderCircle className="animate-spin" />}
             {challenge ? "Verify & continue" : recover ? "Continue" : "Sign in"}
-            <ArrowRight />
           </Button>
         </form>
         <Button
           variant="link"
-          className="mt-4 px-0"
+          className="staff-auth-link"
+          disabled={busy}
           onClick={() => {
-            setRecover(!recover);
+            setRecover(!recover && !challenge);
+            setCode("");
             setChallenge(null);
             setError("");
           }}
         >
           {recover || challenge ? "Back to sign in" : "Forgot your password?"}
         </Button>
-        <div className="notice mt-6">
+        <aside className="staff-auth-demo" aria-label="Demo access">
           <strong>Demo access</strong>
-          <br />
-          Super Admin: irene@loadmaster.test
-          <br />
-          Password: DemoCargo2026!
-          <br />
-          <span className="muted">
-            Other roles: daniel, rita, peter, joan @loadmaster.test.
-          </span>
-        </div>
-      </div>
-    </div>
+          <span>Super Admin: irene@loadmaster.test</span>
+          <span>Password: DemoCargo2026!</span>
+          <span>Other roles: daniel, rita, peter, joan @loadmaster.test.</span>
+        </aside>
+      </section>
+      <footer>Demo environment · no real money</footer>
+    </main>
   );
 }
 function Overview() {
@@ -2154,10 +2170,10 @@ const resizePhoto = (file: File) =>
     img.src = url;
   });
 
-/** Contact, vehicle plate and profile photo, edited in place on the Profile tab. */
-function ProfileEditCard({ p }: { p: Row }) {
+function ProfileEditCard({ p, onClose }: { p: Row; onClose?: () => void }) {
   const { form, mutate, notify } = useAdmin();
   const driver = p.role === "driver";
+  const [name, setName] = useState(p.name || "");
   const [phone, setPhone] = useState(p.phone || "");
   const [plate, setPlate] = useState(p.plate || "");
   const [email, setEmail] = useState(p.email || "");
@@ -2165,12 +2181,14 @@ function ProfileEditCard({ p }: { p: Row }) {
   const [error, setError] = useState("");
   const fileRef = useRef<HTMLInputElement>(null);
   useEffect(() => {
+    setName(p.name || "");
     setPhone(p.phone || "");
     setPlate(p.plate || "");
     setEmail(p.email || "");
     setPhoto(p.photo || null);
-  }, [p.id, p.phone, p.plate, p.email, p.photo]);
+  }, [p.id, p.name, p.phone, p.plate, p.email, p.photo]);
   const changes: Row = {};
+  if (!driver && name.trim() !== p.name) changes.name = name.trim();
   if (phone.trim() !== (p.phone || "")) changes.phone = phone.trim();
   if (driver && plate.trim().toUpperCase() !== (p.plate || ""))
     changes.plate = plate.trim();
@@ -2199,6 +2217,7 @@ function ProfileEditCard({ p }: { p: Row }) {
       onSubmit: async (v) => {
         await mutate("/admin/user", { ...changes, reason: v.reason, id: p.id });
         notify("Profile updated for " + p.name + ".");
+        onClose?.();
       },
     });
   return (
@@ -2260,6 +2279,16 @@ function ProfileEditCard({ p }: { p: Row }) {
             </small>
           </div>
         </div>
+        {!driver && (
+          <div className="profile-field">
+            <Label htmlFor={"name-" + p.id}>Full name</Label>
+            <Input
+              id={"name-" + p.id}
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+            />
+          </div>
+        )}
         <div className="profile-field">
           <Label htmlFor={"phone-" + p.id}>Phone number</Label>
           <Input
@@ -2304,9 +2333,20 @@ function ProfileEditCard({ p }: { p: Row }) {
             ? "Update contact details, vehicle identification and profile photo."
             : "Update contact details and profile photo."}
         </small>
-        <Button size="sm" disabled={!dirty} onClick={save}>
-          Save changes
-        </Button>
+        <div className="flex gap-2">
+          {onClose && (
+            <Button variant="outline" size="sm" onClick={onClose}>
+              Cancel
+            </Button>
+          )}
+          <Button
+            size="sm"
+            disabled={!dirty || (!driver && !name.trim())}
+            onClick={save}
+          >
+            Save changes
+          </Button>
+        </div>
       </footer>
     </section>
   );
@@ -2416,6 +2456,8 @@ function PersonPage({ id }: { id: string }) {
   const { data, form, mutate, can, openOrder, notify } = useAdmin();
   const navigate = useNavigate();
   const [filter, setFilter] = useState("all");
+  const [tab, setTab] = useState<string | null>(null);
+  const [editingCustomer, setEditingCustomer] = useState(false);
   const p = data.people.find((p) => p.id === id);
   if (!p)
     return (
@@ -2506,7 +2548,7 @@ function PersonPage({ id }: { id: string }) {
       />
       {(manageable || can("support") || (driver && canVerify)) && (
         <div className="detail-actions person-actions">
-          {manageable && (
+          {driver && manageable && (
             <Button
               variant="outline"
               size="sm"
@@ -2579,6 +2621,16 @@ function PersonPage({ id }: { id: string }) {
                 </Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="start" className="w-56">
+                {!driver && (
+                  <DropdownMenuItem
+                    onSelect={() => {
+                      setTab("profile");
+                      setEditingCustomer(true);
+                    }}
+                  >
+                    <Pencil /> Edit customer details
+                  </DropdownMenuItem>
+                )}
                 {driver && (
                   <DropdownMenuItem
                     onSelect={() =>
@@ -2772,7 +2824,14 @@ function PersonPage({ id }: { id: string }) {
           <ArrowRight size={14} />
         </button>
       )}
-      <Tabs defaultValue={seesTrips ? "trips" : "profile"} className="mt-6">
+      <Tabs
+        value={tab ?? (seesTrips ? "trips" : "profile")}
+        onValueChange={(value) => {
+          setTab(value);
+          setEditingCustomer(false);
+        }}
+        className="mt-6"
+      >
         <TabsList>
           {seesTrips && (
             <TabsTrigger value="trips">Trips ({trips.length})</TabsTrigger>
@@ -2888,7 +2947,10 @@ function PersonPage({ id }: { id: string }) {
           </TabsContent>
         )}
         <TabsContent value="profile">
-          {manageable && <ProfileEditCard p={p} />}
+          {manageable && driver && <ProfileEditCard p={p} />}
+          {manageable && !driver && editingCustomer && (
+            <ProfileEditCard p={p} onClose={() => setEditingCustomer(false)} />
+          )}
           <DeviceCard p={p} />
           <div className="detail-grid">
             {[

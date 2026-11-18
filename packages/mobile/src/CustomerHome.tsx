@@ -272,7 +272,6 @@ export function CustomerHome() {
             <Text style={styles.addFundsText}>Add funds</Text>
           </Pressable>
         </View>
-        {!featured && <HomeArtworkSlider />}
         <Pressable
           accessibilityRole="button"
           accessibilityLabel="View loyalty rewards offer"
@@ -292,6 +291,7 @@ export function CustomerHome() {
           </View>
           <Icon name="chevron-forward" size={18} color={T.green} />
         </Pressable>
+        {!featured && <HomeArtworkSlider />}
       </ScrollView>
       <WalletSheet visible={wallet} onClose={() => setWallet(false)} />
       <PromoModal visible={promoOpen} onClose={() => setPromoOpen(false)} />
